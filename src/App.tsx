@@ -396,7 +396,7 @@ function DashboardLayout({ onLogout, usuario }: { onLogout: () => void; usuario:
           )}
           
           {/* "Configurações" é visível para todos, exceto PA */}
-          {usuario.perfil !== 'PA' && (
+          { (
             <SidebarLink
               text="Configurações"
               icon={<Settings size={20} />}
@@ -424,15 +424,31 @@ function DashboardLayout({ onLogout, usuario }: { onLogout: () => void; usuario:
             {activePage} {/* O título é a página ativa */}
           </h2>
           <div className="text-right">
-            <div className="font-semibold text-gray-800">
-              {usuario.nome}
-            </div>
-            <div className="text-sm text-gray-500">
-              {/* Mostra o perfil e a central/coop/pa */}
-              {usuario.perfil}
-              {usuario.centralId && ` | Central: ${mockCentrais.find(c => c.id === usuario.centralId)?.nome}`}
-            </div>
-          </div>
+            <div className="flex items-center space-x-6">
+  {/* Bloco de Data/Hora (NOVO) */}
+  <div className="text-right">
+    <div className="text-sm font-semibold text-gray-700">
+      Última atualização:
+    </div>
+    <div className="text-xs text-gray-500">
+      17/11/2025 16:30:00
+      {/* Em um app real, isso viria de um estado ou API */}
+    </div>
+  </div>
+
+  {/* Bloco de Informações do Usuário */}
+  <div className="text-right">
+    <div className="font-semibold text-gray-800">
+      {usuario.nome}
+    </div>
+    <div className="text-sm text-gray-500">
+      {/* Mostra o perfil e a central/coop/pa */}
+      {usuario.perfil}
+      {usuario.centralId && ` | Central: ${mockCentrais.find(c => c.id === usuario.centralId)?.nome}`}
+    </div>
+  </div>
+</div>
+</div>
         </header>
 
         {/* --- ÁREA DE CONTEÚDO CORRIGIDA --- */}
@@ -2394,8 +2410,8 @@ function PaginaRelatorios({ usuario }: { usuario: User }) {
         <KpiCard title="Com Erro" value={mockKpiRelatorios.comErro.toString()} change="" changeType="info" icon={PackageX} />
       </div>
 
-      {/* Tabela de Histórico */}
-      <ViewHistoricoRelatorios historico={mockHistoricoRelatorios} />
+      {/* Tabela de Histórico (AGORA PASSANDO O USUÁRIO) */}
+      <ViewHistoricoRelatorios historico={mockHistoricoRelatorios} usuario={usuario} />
 
       {/* Grelha de Geração */}
       <ViewGerarRelatorios tipos={mockTiposDeRelatorios} />
@@ -2404,8 +2420,7 @@ function PaginaRelatorios({ usuario }: { usuario: User }) {
 }
 
 // --- Componentes da Página Relatórios ---
-
-function ViewHistoricoRelatorios({ historico }: { historico: HistoricoRelatorio[] }) {
+function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoRelatorio[]; usuario: User }) {
   const getStatusClass = (status: HistoricoRelatorio['status']) => {
     switch (status) {
       case 'concluido': return 'bg-green-100 text-green-800';
@@ -2424,18 +2439,71 @@ function ViewHistoricoRelatorios({ historico }: { historico: HistoricoRelatorio[
 
   return (
     <div className="bg-white rounded-xl shadow-lg">
-      <div className="flex flex-col md:flex-row justify-between items-center p-5 border-b border-gray-200 space-y-4 md:space-y-0">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800">Relatórios Disponíveis</h3>
-          <p className="text-sm text-gray-500">Geração e download de relatórios</p>
+      <div className="flex flex-col p-5 border-b border-gray-200 space-y-4">
+        {/* Cabeçalho e Botão */}
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Relatórios Disponíveis</h3>
+            <p className="text-sm text-gray-500">Geração e download de relatórios</p>
+          </div>
+          <button
+            className="flex-shrink-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
+            style={{ backgroundColor: HUB_BRAND_COLOR }}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Novo Relatório
+          </button>
         </div>
-        <button
-          className="flex-shrink-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
-          style={{ backgroundColor: HUB_BRAND_COLOR }}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Novo Relatório
-        </button>
+
+        {/* --- NOVOS FILTROS --- */}
+        <div className="pt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Filtro de Data (Para Todos) */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Período</label>
+            <div className="flex items-center space-x-2">
+              <input type="date" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+              <span className="text-gray-500">até</span>
+              <input type="date" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+            </div>
+          </div>
+
+          {/* Filtro de CPF (Para Todos) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">CPF</label>
+            <input type="text" placeholder="000.000.000-00" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+          </div>
+
+          {/* Filtro de Cooperativa (SÓ CENTRAL VÊ) */}
+{usuario.perfil === 'Central' && (
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Cooperativa</label>
+    <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
+                <option value="">Todas</option>
+                {mockCooperativas.filter(c => c.centralId === usuario.centralId).map(c => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Filtro de PA (CENTRAL E COOPERATIVA VÊEM) */}
+{(usuario.perfil === 'Central' || usuario.perfil === 'Cooperativa') && (
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Ponto de Atendimento</label>
+    <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
+                <option value="">Todos</option>
+                {mockPontosAtendimento.filter(pa => {
+                  if (usuario.perfil === 'Cooperativa') return pa.cooperativaId === usuario.cooperativaId;
+                  // Se for central, precisa de uma lógica mais complexa (não implementada no mock)
+                  return true;
+                }).map(pa => (
+                   <option key={pa.id} value={pa.id}>{pa.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        {/* --- FIM DOS NOVOS FILTROS --- */}
       </div>
 
       {/* Tabela de Histórico */}
@@ -3133,18 +3201,8 @@ function ViewLogsAuditoria({ logs }: { logs: LogAuditoria[] }) {
 // =======================================================================
 function PaginaConfiguracoes({ usuario }: { usuario: User }) {
   
-  // Se for PA, bloqueia a página (o menu já deve esconder, mas é uma garantia)
-  if (usuario.perfil === 'PA') {
-    return (
-      <div className="p-8 bg-white rounded-xl shadow-lg text-center">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
-        <h3 className="text-2xl font-semibold mt-4">Acesso Negado</h3>
-        <p className="mt-2 text-gray-600">
-          Seu perfil não tem acesso à página de configurações.
-        </p>
-      </div>
-    );
-  }
+  // O Perfil 'PA' agora tem acesso, então o bloqueio total foi removido.
+  // O menu lateral já o impede de ver o que não deve.
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -3159,12 +3217,25 @@ function PaginaConfiguracoes({ usuario }: { usuario: User }) {
 
         {/* === VISÍVEL APENAS PARA A CENTRAL === */}
         {usuario.perfil === 'Central' && (
-          <FormCadastroCooperativa usuario={usuario} />
+          <>
+            <FormCadastroCooperativa usuario={usuario} />
+            <FormCadastroPA usuario={usuario} />
+            <FormCadastroUsuario usuario={usuario} /> {/* NOVO */}
+            <FormConfiguracaoCentral /> {/* NOVO */}
+          </>
         )}
-
-        {/* === VISÍVEL PARA CENTRAL OU COOPERATIVA === */}
-        {(usuario.perfil === 'Central' || usuario.perfil === 'Cooperativa') && (
-          <FormCadastroPA usuario={usuario} />
+        
+        {/* === VISÍVEL APENAS PARA A COOPERATIVA === */}
+        {usuario.perfil === 'Cooperativa' && (
+          <>
+            <FormCadastroPA usuario={usuario} />
+            <FormCadastroUsuario usuario={usuario} /> {/* NOVO */}
+          </>
+        )}
+        
+        {/* === VISÍVEL APENAS PARA O PA === */}
+        {usuario.perfil === 'PA' && (
+          <FormCadastroUsuario usuario={usuario} /> /* NOVO */
         )}
       </div>
 
@@ -3178,12 +3249,24 @@ function PaginaConfiguracoes({ usuario }: { usuario: User }) {
 
         {/* === VISÍVEL APENAS PARA A CENTRAL === */}
         {usuario.perfil === 'Central' && (
-          <ListaEdicaoCooperativas usuario={usuario} />
+          <>
+            <ListaEdicaoCooperativas usuario={usuario} />
+            <ListaEdicaoPA usuario={usuario} />
+            <ListaEdicaoUsuarios usuario={usuario} /> {/* NOVO */}
+          </>
+        )}
+        
+        {/* === VISÍVEL APENAS PARA A COOPERATIVA === */}
+        {usuario.perfil === 'Cooperativa' && (
+          <>
+            <ListaEdicaoPA usuario={usuario} />
+            <ListaEdicaoUsuarios usuario={usuario} /> {/* NOVO */}
+          </>
         )}
 
-        {/* === VISÍVEL PARA CENTRAL OU COOPERATIVA === */}
-        {(usuario.perfil === 'Central' || usuario.perfil === 'Cooperativa') && (
-          <ListaEdicaoPA usuario={usuario} />
+        {/* === VISÍVEL APENAS PARA O PA === */}
+        {usuario.perfil === 'PA' && (
+          <ListaEdicaoUsuarios usuario={usuario} /> /* NOVO */
         )}
       </div>
     </div>
@@ -3192,6 +3275,7 @@ function PaginaConfiguracoes({ usuario }: { usuario: User }) {
 
 // --- Sub-componentes de Configurações ---
 
+// (FormCadastroCentral e ListaEdicaoCentrais permanecem iguais)
 // MASTER: Cadastra Central
 function FormCadastroCentral() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -3263,6 +3347,8 @@ function ListaEdicaoCentrais() {
   );
 }
 
+
+// (FormCadastroCooperativa e ListaEdicaoCooperativas permanecem iguais)
 // CENTRAL: Cadastra Cooperativa
 function FormCadastroCooperativa({ usuario }: { usuario: User }) {
    return (
@@ -3303,6 +3389,8 @@ function ListaEdicaoCooperativas({ usuario }: { usuario: User }) {
   );
 }
 
+
+// (FormCadastroPA e ListaEdicaoPA permanecem iguais)
 // CENTRAL ou COOPERATIVA: Cadastra PA
 function FormCadastroPA({ usuario }: { usuario: User }) {
   return (
@@ -3362,6 +3450,103 @@ function ListaEdicaoPA({ usuario }: { usuario: User }) {
         )) : (
           <p className="text-sm text-gray-500 text-center">Nenhum Ponto de Atendimento encontrado para este perfil.</p>
         )}
+       </div>
+    </div>
+  );
+}
+
+// --- NOVOS COMPONENTES (CADASTRO DE USUÁRIO E CONFIG) ---
+
+// NOVO: CENTRAL - Configuração de Sincronia
+function FormConfiguracaoCentral() {
+  return (
+    <div className="p-8 bg-white rounded-xl shadow-lg">
+      <h3 className="text-xl font-semibold text-gray-800">Configurações da Central</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-6">
+        Defina o tempo de sincronização dos dados do dashboard.
+      </p>
+      <div className="space-y-3">
+        <label className="flex items-center p-3 border rounded-lg">
+          <input type="radio" name="sync-time" className="w-4 h-4 text-hub-teal" defaultChecked />
+          <span className="ml-3 text-sm font-medium">5 minutos</span>
+        </label>
+        <label className="flex items-center p-3 border rounded-lg">
+          <input type="radio" name="sync-time" className="w-4 h-4 text-hub-teal" />
+          <span className="ml-3 text-sm font-medium">10 minutos</span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+// NOVO: CENTRAL, COOPERATIVA, PA - Cadastra Usuário
+function FormCadastroUsuario({ usuario }: { usuario: User }) {
+  let titulo = "Cadastrar Novo Usuário";
+  if (usuario.perfil === 'Central') titulo = "Cadastrar Usuário (Central, Coop ou PA)";
+  if (usuario.perfil === 'Cooperativa') titulo = "Cadastrar Usuário (Coop ou PA)";
+  if (usuario.perfil === 'PA') titulo = "Cadastrar Usuário (PA)";
+
+  return (
+    <div className="p-8 bg-white rounded-xl shadow-lg">
+      <h3 className="text-xl font-semibold text-gray-800">{titulo}</h3>
+      <form className="space-y-4 mt-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Nome do Usuário</label>
+          <input type="text" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+        </div>
+        
+        {/* Lógica de seleção de perfil com base em quem está logado */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Perfil</label>
+          <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
+            {usuario.perfil === 'Central' && <option value="central">Central</option>}
+            {(usuario.perfil === 'Central' || usuario.perfil === 'Cooperativa') && <option value="cooperativa">Cooperativa</option>}
+            <option value="pa">Ponto de Atendimento</option>
+          </select>
+        </div>
+
+        <button type="submit" className="w-full flex items-center justify-center px-6 py-2 text-white rounded-lg shadow-sm" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+          <UserPlus className="w-5 h-5 mr-2" /> Cadastrar Usuário
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// NOVO: CENTRAL, COOPERATIVA, PA - Edita Usuários
+function ListaEdicaoUsuarios({ usuario }: { usuario: User }) {
+  // Apenas um mock simples para ilustração
+  const usuariosVisiveis = [
+    { id: 1, nome: "Usuário Exemplo 1 (Coop)", perfil: "Cooperativa" },
+    { id: 2, nome: "Usuário Exemplo 2 (PA)", perfil: "PA" },
+  ];
+  
+  return (
+    <div className="p-8 bg-white rounded-xl shadow-lg">
+       <h3 className="text-xl font-semibold text-gray-800">Usuários Cadastrados</h3>
+       <p className="text-sm text-gray-500 mt-1 mb-6">Edite os usuários da sua hierarquia.</p>
+       <div className="space-y-4 max-h-96 overflow-y-auto">
+        {usuariosVisiveis.map(user => (
+          // Filtra para não mostrar perfis que o usuário não pode ver
+          (usuario.perfil === 'Central' ||
+           (usuario.perfil === 'Cooperativa' && user.perfil !== 'Central') ||
+           (usuario.perfil === 'PA' && user.perfil === 'PA')) &&
+          (
+            <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+              <div>
+                <p className="text-lg font-semibold text-gray-900">{user.nome}</p>
+                <p className="text-sm text-gray-500">Perfil: {user.perfil}</p>
+              </div>
+              <button className="flex items-center px-4 py-2 text-sm text-white bg-hub-teal rounded-lg shadow-sm">
+                <Edit2 className="w-4 h-4 mr-2" /> Editar
+              </button>
+            </div>
+          )
+        ))}
        </div>
     </div>
   );
