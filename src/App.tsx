@@ -1459,6 +1459,27 @@ const mockListaDeCartoes: Cartao[] = [
   { id: 8, cooperado: 'Maria Santos Oliveira', conta: 'CC-002-124567', tipo: 'platinum', bandeira: 'MASTERCARD', limite: 25000, disponivel: 15000, validade: '29/06/2029', status: 'ativo' },
 ];
 
+// --- Novos Tipos para Acompanhamento de Entrega ---
+type StatusEntrega = 'Criado' | 'Em produção' | 'Em entrega' | 'Entregue';
+type CartaoEntrega = {
+  id: number;
+  cooperado: string;
+  tipoCartao: string; // ex: Visa Infinite
+  status: StatusEntrega;
+  dataCriacao: string;
+  previsaoEntrega?: string; // Apenas se estiver em entrega
+  rastreio?: string;
+};
+
+// --- Dados Mockados para Acompanhamento de Entrega ---
+const mockEntregaCartoes: CartaoEntrega[] = [
+  { id: 1, cooperado: 'Ana Beatriz Silva', tipoCartao: 'Visa Infinite', status: 'Em entrega', dataCriacao: '10/11/2025', previsaoEntrega: '20/11/2025', rastreio: 'BR123456789' },
+  { id: 2, cooperado: 'Roberto L. Souza', tipoCartao: 'Visa Gold', status: 'Em produção', dataCriacao: '14/11/2025' },
+  { id: 3, cooperado: 'Daniel C. Oliveira', tipoCartao: 'Visa Classic', status: 'Criado', dataCriacao: '16/11/2025' },
+  { id: 4, cooperado: 'Maria Santos Oliveira', tipoCartao: 'Visa Platinum', status: 'Em entrega', dataCriacao: '08/11/2025', previsaoEntrega: '18/11/2025', rastreio: 'BR987654321' },
+  { id: 5, cooperado: 'Carlos Eduardo Souza', tipoCartao: 'Visa Gold', status: 'Criado', dataCriacao: '17/11/2025' },
+];
+
 const mockAnuidadeProdutos: ProdutoAnuidade[] = [
   { id: 'infinite', nome: 'Infinite', valor: 480.00 },
   { id: 'classic', nome: 'Classic', valor: 0.00 },
@@ -1480,17 +1501,18 @@ const mockConfiguracoesProduto: ProdutoConfig[] = [
   { id: 'empresarial', nome: 'Empresarial', multa: 3.0, mora: 15.00, juros: 2.0 },
 ];
 
-// --- Componente PAI da Página Cartões ---
-type CartoesViewMode = 'lista' | 'upgrade' | 'anuidade_cooperado' | 'anuidade_produto' | 'configuracoes_produto';
+// --- Componente PAI da Página Cartões (ATUALIZADO) ---
+type CartoesViewMode = 'lista' | 'upgrade' | 'anuidade_cooperado' | 'anuidade_produto' | 'configuracoes_produto' | 'acompanhar_entrega';
 
 function PaginaCartoes({ usuario }: { usuario: User }) {
-  // ... (código idêntico)
   const [viewMode, setViewMode] = useState<CartoesViewMode>('lista');
 
   const renderView = () => {
     switch (viewMode) {
       case 'lista':
         return <ViewListaPrincipalCartoes kpis={mockKpiCartoes} cartoes={mockListaDeCartoes} />;
+      case 'acompanhar_entrega': // NOVO CASE
+        return <ViewAcompanharEntrega entregas={mockEntregaCartoes} />;
       case 'upgrade':
         return <ViewUpgradeDowngrade />;
       case 'anuidade_cooperado':
@@ -1506,11 +1528,16 @@ function PaginaCartoes({ usuario }: { usuario: User }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex space-x-2 border-b border-gray-200">
+      <div className="flex space-x-2 border-b border-gray-200 overflow-x-auto pb-1">
         <SubMenuButton
           label="Gestão de Cartões"
           active={viewMode === 'lista'}
           onClick={() => setViewMode('lista')}
+        />
+        <SubMenuButton // NOVO BOTÃO
+          label="Acompanhar Entrega"
+          active={viewMode === 'acompanhar_entrega'}
+          onClick={() => setViewMode('acompanhar_entrega')}
         />
         <SubMenuButton
           label="Upgrade/Downgrade"
@@ -1518,17 +1545,17 @@ function PaginaCartoes({ usuario }: { usuario: User }) {
           onClick={() => setViewMode('upgrade')}
         />
         <SubMenuButton
-          label="Anuidade por Cooperado"
+          label="Anuidade (Cooperado)"
           active={viewMode === 'anuidade_cooperado'}
           onClick={() => setViewMode('anuidade_cooperado')}
         />
         <SubMenuButton
-          label="Anuidade por Produto"
+          label="Anuidade (Produto)"
           active={viewMode === 'anuidade_produto'}
           onClick={() => setViewMode('anuidade_produto')}
         />
         <SubMenuButton
-          label="Configurações do Produto"
+          label="Configurações"
           active={viewMode === 'configuracoes_produto'}
           onClick={() => setViewMode('configuracoes_produto')}
         />
@@ -1651,6 +1678,77 @@ function ViewListaPrincipalCartoes({ kpis, cartoes }: { kpis: typeof mockKpiCart
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+// =======================================================
+// View NOVO: Acompanhar Entrega de Cartão
+// =======================================================
+function ViewAcompanharEntrega({ entregas }: { entregas: CartaoEntrega[] }) {
+  
+  const getStatusStyle = (status: StatusEntrega) => {
+    switch (status) {
+      case 'Criado': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'Em produção': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Em entrega': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Entregue': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg">
+      <div className="p-5 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-800">Rastreamento de Cartões</h3>
+        <p className="text-sm text-gray-500">Acompanhe o status de produção e entrega dos cartões solicitados.</p>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-max">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cartão Solicitado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Solicitação</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Atual</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Previsão de Entrega</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cód. Rastreio</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {entregas.map((item) => (
+              <tr key={item.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {item.cooperado}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {item.tipoCartao}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {item.dataCriacao}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusStyle(item.status)}`}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
+                  {item.status === 'Em entrega' ? (
+                    <span className="text-hub-teal">{item.previsaoEntrega}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                   {item.rastreio ? (
+                     <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{item.rastreio}</span>
+                   ) : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
