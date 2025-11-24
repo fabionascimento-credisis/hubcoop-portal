@@ -76,12 +76,14 @@ import {
   UserCheck, 
   Upload,
   UserPlus,
+  User,
   Gift, // Para Loyalty
   Armchair, // Para Sala VIP
   Plane, // Para Milhas
   Coffee, // Para Sala VIP
   CheckSquare, // Para Conciliação
-  CreditCard as CreditCardIcon, // Alias se necessário
+  CreditCard as CreditCardIcon, 
+  ArrowDownCircle,
 } from 'lucide-react';
 
 // --- Cor Principal da Hubcoop ---
@@ -357,7 +359,13 @@ function DashboardLayout({ onLogout, usuario }: { onLogout: () => void; usuario:
           {usuario.perfil === 'Central' && (
             <SidebarLink text="Usuários" icon={<Users size={18} />} active={activePage === 'Usuarios'} onClick={() => setActivePage('Usuarios')} />
           )}
-        </nav>
+        <SidebarLink text="Gestão de Limites" icon={<SlidersHorizontal size={18} />} active={activePage === 'GestaoLimites'} onClick={() => setActivePage('GestaoLimites')} />
+<SidebarLink text="Conta Salário" icon={<Wallet size={18} />} active={activePage === 'ContaSalario'} onClick={() => setActivePage('ContaSalario')} />
+<SidebarLink text="Serviços Adicionais" icon={<Coffee size={18} />} active={activePage === 'ServicosAdicionais'} onClick={() => setActivePage('ServicosAdicionais')} />
+{usuario.perfil === 'Central' && (
+  <SidebarLink text="Baixas Manuais" icon={<ArrowDownCircle size={18} />} active={activePage === 'Baixas'} onClick={() => setActivePage('Baixas')} />
+)}
+</nav>
 
         {/* 4.3. Rodapé do Menu (Configurações e Sair) */}
         <div className="p-2 border-t border-white border-opacity-20 space-y-1">
@@ -412,7 +420,10 @@ function DashboardLayout({ onLogout, usuario }: { onLogout: () => void; usuario:
           {activePage === 'Cooperativas' && <PaginaCooperativas usuario={usuario} />} 
           {activePage === 'Usuarios' && <PaginaUsuarios usuario={usuario} />}
           {activePage === 'Configuracoes' && <PaginaConfiguracoes usuario={usuario} />}
-          
+          {activePage === 'GestaoLimites' && <PaginaGestaoLimites usuario={usuario} />} 
+          {activePage === 'ContaSalario' && <PaginaContaSalario usuario={usuario} />}
+          {activePage === 'ServicosAdicionais' && <PaginaServicosAdicionais usuario={usuario} />}
+          {activePage === 'Baixas' && <PaginaBaixas usuario={usuario} />}
           {activePage !== 'Dashboard' && 
            activePage !== 'Cooperados' && 
            activePage !== 'Cartoes' && 
@@ -423,7 +434,12 @@ function DashboardLayout({ onLogout, usuario }: { onLogout: () => void; usuario:
            activePage !== 'SalaVIP' &&
            activePage !== 'Cooperativas' &&
            activePage !== 'Usuarios' &&
-           activePage !== 'Configuracoes' && (
+           activePage !== 'Configuracoes' &&
+           activePage !== 'GestaoLimites' &&       
+           activePage !== 'ContaSalario' &&        
+           activePage !== 'ServicosAdicionais' &&
+           activePage !== 'Baixas' &&
+           (
             <PaginaPlaceholder pageName={activePage} />
           )}
         </main>
@@ -713,102 +729,172 @@ function AtividadePorCartao({ data }: { data: Atividade[] }) {
     </div>
   );
 }
-// --- Definição de Tipos para Cooperados (ATUALIZADO) ---
-type Cooperado = {
+// --- TIPOS ATUALIZADOS PARA COOPERADOS ---
+type StatusConta = 'Ativa' | 'Bloqueada';
+type TipoVinculo = 'Titular' | 'Adicional' | 'Kids';
+type FuncaoCartao = 'Credito' | 'Debito' | 'Multiplo';
+
+type Endereco = {
+  logradouro: string; numero: string; bairro: string; cidade: string; uf: string; cep: string;
+};
+
+type Gerente = {
+  nome: string;
+  usuarioSistema: string;
+};
+
+type ContaCorrente = {
+  id: string;
+  banco: string;
+  agencia: string;
+  numero: string;
+  dataAbertura: string;
+  status: StatusConta;
+  paVinculado: string; // Ex: PA 03
+  documentoVinculado: string; // CPF ou CNPJ desta conta
+};
+
+type CartaoResumo = {
+  id: string; // ID interno
+  numeroMascarado: string;
+  funcao: FuncaoCartao;
+  status: StatusConta;
+  paVinculado: string;
+  tipo: TipoVinculo; // Se este cartão específico é titular, adicional ou kids
+  titularVinculadoId?: number; // Se for adicional/kids, aponta pro pai
+  nomeImpresso: string;
+};
+
+type Socio = {
+  nome: string;
+  cpf: string;
+};
+
+type CooperadoDetalhado = {
   id: number;
   nome: string;
   cpf: string;
-  cooperativa: string; // ex: Coopesa
+  cnpj?: string; // Opcional, um cooperado pode ter CNPJ vinculado
+  socios?: Socio[]; // Se tiver CNPJ
+  
   email: string;
   telefone: string;
-  status: 'ativo' | 'bloqueado';
-  // --- CAMPOS ADICIONADOS ---
+  
+  gerente: Gerente;
+  enderecoEntrega: Endereco;
+  
+  // Arrays para suportar múltiplas contas em PAs diferentes
+  contasCorrentes: ContaCorrente[];
+  contasCartoes: CartaoResumo[];
+
+  // Dados de Sistema para Permissão de Visualização
   centralId: string;
   cooperativaId: string;
-  pontoAtendimentoId: string;
-};
-type TransacaoCooperado = {
-  id: number; cod: string; data: string;
-  status: 'Negado' | 'Aprovado' | 'Em análise';
-  cartao: string; limite: string;
+  // O PA principal (para filtros de lista), embora ele possa ter contas em outros
+  pontoAtendimentoPrincipalId: string; 
 };
 
-// --- Dados Mockados da Página Cooperados (ATUALIZADOS) ---
-const mockCooperados: Cooperado[] = [
-  // Cooperados da Coopesa (PA 03)
-  { id: 1, nome: 'Maria Santos Oliveira', cpf: '234.567.890-11', cooperativa: 'Coopesa', email: 'maria.santos@email.com', telefone: '(11) 99076-5432', status: 'ativo', centralId: 'c2', cooperativaId: 'coop_coopesa', pontoAtendimentoId: 'pa_03' },
-  { id: 2, nome: 'João Pedro Costa', cpf: '345.678.901-22', cooperativa: 'Coopesa', email: 'joao.costa@email.com', telefone: '(41) 98765-1234', status: 'ativo', centralId: 'c2', cooperativaId: 'coop_coopesa', pontoAtendimentoId: 'pa_03' },
-  // Cooperados da Coopesa (PA 04)
-  { id: 3, nome: 'Carlos Eduardo Souza', cpf: '567.890.123-44', cooperativa: 'Coopesa', email: 'carlos.souza@email.com', telefone: '(81) 98765-0012', status: 'ativo', centralId: 'c2', cooperativaId: 'coop_coopesa', pontoAtendimentoId: 'pa_04' },
-  // Cooperados da Crediserv (PA 05)
-  { id: 4, nome: 'Ana Paula Ferreira', cpf: '456.789.012-33', cooperativa: 'Crediserv', email: 'ana.ferreira@email.com', telefone: '(31) 99076-5678', status: 'ativo', centralId: 'c2', cooperativaId: 'coop_crediserv', pontoAtendimentoId: 'pa_05' },
-  { id: 5, nome: 'Fernanda Lima Santos', cpf: '678.901.234-55', cooperativa: 'Crediserv', email: 'fernanda.lima@email.com', telefone: '(11) 97654-3210', status: 'bloqueado', centralId: 'c2', cooperativaId: 'coop_crediserv', pontoAtendimentoId: 'pa_05' },
-];
-const mockTransacoesCooperado: TransacaoCooperado[] = [
-  { id: 1, cod: '1538', data: '18/12/19', status: 'Negado', cartao: 'Visa Classic', limite: 'R$5.000,00' },
-  { id: 2, cod: '1538', data: '18/12/19', status: 'Em análise', cartao: 'Visa Classic', limite: 'R$5.000,00' },
-  { id: 3, cod: '1538', data: '18/12/19', status: 'Aprovado', cartao: 'Visa Classic', limite: 'R$5.000,00' },
-  { id: 4, cod: '1538', data: '18/12/19', status: 'Negado', cartao: 'Visa Classic', limite: 'R$5.000,00' },
-  { id: 5, cod: '1538', data: '18/12/19', status: 'Aprovado', cartao: 'Visa Empresarial', limite: 'R$5.000,00' },
-];
-const mockTiposDeCartao = [
-  { id: 'classic', nome: 'Classic', img: 'https://placehold.co/100x60/a0aec0/ffffff?text=VISA' },
-  { id: 'empresarial', nome: 'Empresarial', img: 'https://placehold.co/100x60/2c5282/ffffff?text=VISA' }, // <-- SUBSTITUÍDO
-  { id: 'gold', nome: 'Gold', img: 'https://placehold.co/100x60/d69e2e/ffffff?text=VISA' },
-  { id: 'infinite', nome: 'Infinite', img: 'https://placehold.co/100x60/2d3748/ffffff?text=VISA' },
-  { id: 'platinum', nome: 'Platinum', img: 'https://placehold.co/100x60/718096/ffffff?text=VISA' },
+// --- MOCKS DE COOPERADOS (CENÁRIOS COMPLEXOS) ---
+const mockCooperadosDetalhados: CooperadoDetalhado[] = [
+  // EXEMPLO 1: Cooperado "Polvo" (CPF + CNPJ, Múltiplos PAs, Múltiplos Cartões)
+  {
+    id: 1,
+    nome: 'Roberto Empresário Silva',
+    cpf: '111.222.333-44',
+    cnpj: '12.345.678/0001-90',
+    email: 'roberto@empresa.com',
+    telefone: '(11) 99999-0000',
+    gerente: { nome: 'Mariana Gerente', usuarioSistema: 'mariana.ger' },
+    enderecoEntrega: { logradouro: 'Av. Paulista', numero: '1000', bairro: 'Bela Vista', cidade: 'São Paulo', uf: 'SP', cep: '01310-100' },
+    socios: [
+      { nome: 'Sócio Irmão Silva', cpf: '999.888.777-66' }
+    ],
+    contasCorrentes: [
+      { id: 'cc1', banco: 'Sicoob', agencia: '0001', numero: '12345-6', dataAbertura: '10/01/2020', status: 'Ativa', paVinculado: 'PA 03', documentoVinculado: '111.222.333-44' },
+      { id: 'cc2', banco: 'Sicoob', agencia: '0001', numero: '99887-0', dataAbertura: '15/05/2022', status: 'Ativa', paVinculado: 'PA 04', documentoVinculado: '12.345.678/0001-90' }
+    ],
+    contasCartoes: [
+      { id: 'card1', numeroMascarado: '4984 **** **** 1111', funcao: 'Multiplo', status: 'Ativa', paVinculado: 'PA 03', tipo: 'Titular', nomeImpresso: 'ROBERTO E SILVA' },
+      { id: 'card2', numeroMascarado: '5500 **** **** 2222', funcao: 'Credito', status: 'Bloqueada', paVinculado: 'PA 04', tipo: 'Titular', nomeImpresso: 'EMPRESA SILVA LTDA' }
+    ],
+    centralId: 'c2', cooperativaId: 'coop_coopesa', pontoAtendimentoPrincipalId: 'pa_03'
+  },
+
+  // EXEMPLO 2: Titular de Família (Com Adicional e Kids vinculados)
+  {
+    id: 2,
+    nome: 'Ana Mãe de Família',
+    cpf: '222.333.444-55',
+    email: 'ana.familia@email.com',
+    telefone: '(21) 98888-7777',
+    gerente: { nome: 'Carlos Atendente', usuarioSistema: 'carlos.pa05' },
+    enderecoEntrega: { logradouro: 'Rua das Acácias', numero: '50', bairro: 'Leblon', cidade: 'Rio de Janeiro', uf: 'RJ', cep: '22450-000' },
+    contasCorrentes: [
+      { id: 'cc3', banco: 'Sicoob', agencia: '0002', numero: '55555-5', dataAbertura: '20/03/2019', status: 'Ativa', paVinculado: 'PA 05', documentoVinculado: '222.333.444-55' }
+    ],
+    contasCartoes: [
+      { id: 'card3', numeroMascarado: '4111 **** **** 3333', funcao: 'Multiplo', status: 'Ativa', paVinculado: 'PA 05', tipo: 'Titular', nomeImpresso: 'ANA FAMILIA' }
+    ],
+    centralId: 'c2', cooperativaId: 'coop_crediserv', pontoAtendimentoPrincipalId: 'pa_05'
+  },
+
+  // EXEMPLO 3: Conta Kids (Vinculada à Ana - ID 2)
+  {
+    id: 3,
+    nome: 'Enzo Filho Kids',
+    cpf: '555.666.777-88',
+    email: 'enzo.games@email.com',
+    telefone: '(21) 98888-7777',
+    gerente: { nome: 'Carlos Atendente', usuarioSistema: 'carlos.pa05' },
+    enderecoEntrega: { logradouro: 'Rua das Acácias', numero: '50', bairro: 'Leblon', cidade: 'Rio de Janeiro', uf: 'RJ', cep: '22450-000' },
+    contasCorrentes: [], // Kids as vezes não tem CC própria, usa mesada na conta cartão
+    contasCartoes: [
+      { id: 'card4', numeroMascarado: '4111 **** **** 4444', funcao: 'Debito', status: 'Ativa', paVinculado: 'PA 05', tipo: 'Kids', titularVinculadoId: 2, nomeImpresso: 'ENZO FILHO' }
+    ],
+    centralId: 'c2', cooperativaId: 'coop_crediserv', pontoAtendimentoPrincipalId: 'pa_05'
+  },
+
+  // EXEMPLO 4: Adicional (Esposo da Ana - ID 2)
+  {
+    id: 4,
+    nome: 'Paulo Esposo Adicional',
+    cpf: '888.999.000-11',
+    email: 'paulo.esposo@email.com',
+    telefone: '(21) 97777-6666',
+    gerente: { nome: 'Carlos Atendente', usuarioSistema: 'carlos.pa05' },
+    enderecoEntrega: { logradouro: 'Rua das Acácias', numero: '50', bairro: 'Leblon', cidade: 'Rio de Janeiro', uf: 'RJ', cep: '22450-000' },
+    contasCorrentes: [],
+    contasCartoes: [
+      { id: 'card5', numeroMascarado: '4111 **** **** 5555', funcao: 'Credito', status: 'Ativa', paVinculado: 'PA 05', tipo: 'Adicional', titularVinculadoId: 2, nomeImpresso: 'PAULO ESPOSO' }
+    ],
+    centralId: 'c2', cooperativaId: 'coop_crediserv', pontoAtendimentoPrincipalId: 'pa_05'
+  }
 ];
 
-// --- Componente PAI da Página Cooperados (COM LÓGICA DE SEGREGAÇÃO) ---
 function PaginaCooperados({ usuario }: { usuario: User }) {
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
-  const [selectedCooperado, setSelectedCooperado] = useState<Cooperado | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedCooperado, setSelectedCooperado] = useState<CooperadoDetalhado | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // --- LÓGICA DE SEGREGAÇÃO (NOVA) ---
-  const cooperadosVisiveis = mockCooperados.filter(coop => {
-    if (usuario.perfil === 'Central') {
-      return coop.centralId === usuario.centralId;
-    }
-    if (usuario.perfil === 'Cooperativa') {
-      return coop.cooperativaId === usuario.cooperativaId;
-    }
-    if (usuario.perfil === 'PA') {
-      return coop.pontoAtendimentoId === usuario.pontoAtendimentoId;
-    }
-    return false; // Master não vê cooperados
+  // Filtros de Segregação
+  const cooperadosVisiveis = mockCooperadosDetalhados.filter(coop => {
+    if (usuario.perfil === 'Central') return coop.centralId === usuario.centralId;
+    if (usuario.perfil === 'Cooperativa') return coop.cooperativaId === usuario.cooperativaId;
+    if (usuario.perfil === 'PA') return coop.pontoAtendimentoPrincipalId === usuario.pontoAtendimentoId;
+    return false;
   });
 
   const filteredCooperados = cooperadosVisiveis.filter(c =>
     c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.cpf.includes(searchTerm) ||
+    (c.cnpj && c.cnpj.includes(searchTerm)) ||
     c.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelectCooperado = (cooperado: Cooperado) => {
+  const handleSelectCooperado = (cooperado: CooperadoDetalhado) => {
     setSelectedCooperado(cooperado);
     setViewMode('detail');
   };
-  const handleBackToList = () => {
-    setViewMode('list');
-    setSelectedCooperado(null);
-  };
-  const handleOpenModal = () => { setShowModal(true); };
-  const handleCloseModal = () => { setShowModal(false); };
-
-  // Se o Master cair aqui (não devia, mas por via das dúvidas)
-  if (usuario.perfil === 'Master') {
-    return (
-      <div className="p-8 bg-white rounded-xl shadow-lg text-center">
-        <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto" />
-        <h3 className="text-2xl font-semibold mt-4">Acesso Indisponível</h3>
-        <p className="mt-2 text-gray-600">
-          O perfil Master não gerencia cooperados.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -818,7 +904,7 @@ function PaginaCooperados({ usuario }: { usuario: User }) {
         </h2>
         {viewMode === 'detail' && (
           <button
-            onClick={handleBackToList}
+            onClick={() => { setViewMode('list'); setSelectedCooperado(null); }}
             className="flex items-center px-4 py-2 text-sm font-medium text-gray-600 bg-white rounded-lg shadow-sm hover:bg-gray-50"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
@@ -826,6 +912,7 @@ function PaginaCooperados({ usuario }: { usuario: User }) {
           </button>
         )}
       </div>
+
       {viewMode === 'list' && (
         <ListaCooperados
           cooperados={filteredCooperados}
@@ -834,18 +921,9 @@ function PaginaCooperados({ usuario }: { usuario: User }) {
           onSelect={handleSelectCooperado}
         />
       )}
+      
       {viewMode === 'detail' && selectedCooperado && (
-        <DetalheCooperado
-          cooperado={selectedCooperado}
-          transacoes={mockTransacoesCooperado}
-          onSolicitarCartao={handleOpenModal}
-        />
-      )}
-      {showModal && selectedCooperado && (
-        <ModalSolicitarCartao
-          cooperado={selectedCooperado}
-          onClose={handleCloseModal}
-        />
+        <DetalheCooperado cooperado={selectedCooperado} />
       )}
     </div>
   );
@@ -859,7 +937,21 @@ type ListaCooperadosProps = {
   onSelect: (cooperado: Cooperado) => void;
 };
 
-function ListaCooperados({ cooperados, searchTerm, setSearchTerm, onSelect }: ListaCooperadosProps) {
+function ListaCooperados({ cooperados, searchTerm, setSearchTerm, onSelect }: { cooperados: CooperadoDetalhado[]; searchTerm: string; setSearchTerm: (t: string) => void; onSelect: (c: CooperadoDetalhado) => void }) {
+  
+  const getFuncaoBadge = (cards: CartaoResumo[]) => {
+    // Simplificação: pega a função do primeiro cartão ativo
+    const principal = cards[0];
+    if (!principal) return <span className="text-xs text-gray-400">Sem Cartão</span>;
+    return <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs border border-blue-100">{principal.funcao}</span>;
+  };
+
+  const getTipoBadge = (cards: CartaoResumo[]) => {
+    const tipo = cards[0]?.tipo || 'Titular';
+    const color = tipo === 'Kids' ? 'bg-pink-100 text-pink-800' : tipo === 'Adicional' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800';
+    return <span className={`px-2 py-0.5 rounded text-xs font-semibold ${color}`}>{tipo}</span>;
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg">
       <div className="flex justify-between items-center p-5 border-b border-gray-200">
@@ -873,48 +965,48 @@ function ListaCooperados({ cooperados, searchTerm, setSearchTerm, onSelect }: Li
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         </div>
-        <button
-          className="flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
-          style={{ backgroundColor: HUB_BRAND_COLOR }}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Novo Cooperado
+        <button className="flex items-center px-4 py-2 text-white rounded-lg shadow-sm" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+          <Plus className="w-5 h-5 mr-2" /> Novo Cooperado
         </button>
       </div>
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-max">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperativa</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visualizar</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documentos</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Função Cartão</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gerente / PA</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {cooperados.map((cooperado) => (
-              <tr key={cooperado.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cooperado.nome}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cooperado.cpf}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cooperado.cooperativa}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cooperado.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cooperado.telefone}</td>
+            {cooperados.map((coop) => (
+              <tr key={coop.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
-                    cooperado.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {cooperado.status}
-                  </span>
+                  <div className="text-sm font-medium text-gray-900">{coop.nome}</div>
+                  <div className="text-xs text-gray-500">{coop.email}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">CPF: {coop.cpf}</div>
+                  {coop.cnpj && <div className="text-xs text-gray-500">CNPJ: {coop.cnpj}</div>}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                   {getTipoBadge(coop.contasCartoes)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                   {getFuncaoBadge(coop.contasCartoes)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                   <div>{coop.gerente.nome}</div>
+                   <div className="text-xs font-mono bg-gray-100 inline px-1 rounded">{coop.pontoAtendimentoPrincipalId.toUpperCase().replace('_', ' ')}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {/* REMOVIDO O BOTÃO DE LIXEIRA, MANTEVE APENAS O OLHO */}
                   <button 
-                    onClick={() => onSelect(cooperado)} 
+                    onClick={() => onSelect(coop)} 
                     className="text-hub-teal hover:text-hub-teal-dark p-2 bg-teal-50 rounded-full hover:bg-teal-100 transition-colors"
-                    title="Visualizar Detalhes"
                   >
                     <Eye className="w-5 h-5" />
                   </button>
@@ -932,380 +1024,353 @@ type DetalheCooperadoProps = {
   transacoes: TransacaoCooperado[];
   onSolicitarCartao: () => void;
 };
-function DetalheCooperado({ cooperado, transacoes, onSolicitarCartao }: DetalheCooperadoProps) {
-  // ... (código idêntico)
+function DetalheCooperado({ cooperado }: { cooperado: CooperadoDetalhado }) {
+  const [showModalBloqueio, setShowModalBloqueio] = useState(false);
+  const [showLinkedModal, setShowLinkedModal] = useState<number | null>(null); // ID do cooperado vinculado para mostrar (simulação)
+
+  // Encontrar vínculos (Mock Logic)
+  const vinculados = mockCooperadosDetalhados.filter(c => 
+    c.contasCartoes.some(card => card.titularVinculadoId === cooperado.id)
+  );
+
+  const paiVinculado = cooperado.contasCartoes[0]?.titularVinculadoId 
+    ? mockCooperadosDetalhados.find(c => c.id === cooperado.contasCartoes[0].titularVinculadoId)
+    : null;
+
   return (
-    <div className="space-y-6">
-      <div className="p-6 bg-white rounded-xl shadow-lg">
-        <div className="flex justify-between items-center">
-           <h3 className="text-xl font-semibold text-gray-800">Dados do Cooperado</h3>
-           <button
-             onClick={onSolicitarCartao}
-             className="flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
-             style={{ backgroundColor: HUB_BRAND_COLOR }}
-           >
-             <Plus className="w-5 h-5 mr-2" />
-             Solicitar Novo Cartão
-           </button>
+    <div className="space-y-6 animate-fade-in">
+      
+      {/* CARD 1: Cabeçalho e Ações Principais */}
+      <div className="p-6 bg-white rounded-xl shadow-lg border-l-4 border-hub-teal flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-800">{cooperado.nome}</h3>
+          <div className="flex items-center space-x-3 mt-1 text-sm text-gray-500">
+            <span>ID: {cooperado.id}</span>
+            <span>•</span>
+            <span className="flex items-center"><UserCheck className="w-4 h-4 mr-1"/> {cooperado.gerente.nome} ({cooperado.gerente.usuarioSistema})</span>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <div>
-            <label className="text-xs font-medium text-gray-500">Nome Completo</label>
-            <p className="text-sm text-gray-900">{cooperado.nome}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500">CPF</label>
-            <p className="text-sm text-gray-900">{cooperado.cpf}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500">Status</label>
-            <p className="text-sm text-gray-900 capitalize">{cooperado.status}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500">E-mail</label>
-            <p className="text-sm text-gray-900">{cooperado.email}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500">Telefone</label>
-            <p className="text-sm text-gray-900">{cooperado.telefone}</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500">Cooperativa</label>
-            <p className="text-sm text-gray-900">{cooperado.cooperativa}</p>
-          </div>
+        <div className="flex space-x-3 mt-4 md:mt-0">
+          <button 
+            onClick={() => setShowModalBloqueio(true)}
+            className="flex items-center px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition"
+          >
+            <ShieldAlert className="w-5 h-5 mr-2"/>
+            Gerenciar Bloqueios
+          </button>
         </div>
       </div>
-      <div className="p-6 bg-white rounded-xl shadow-lg">
-        <h3 className="text-xl font-semibold text-gray-800">Transações do Cooperado</h3>
-        <p className="text-sm text-gray-500 mb-4">Exibindo as últimas transações e solicitações.</p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cód.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Situação</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cartão</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Limite Inicial</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {transacoes.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tx.cod}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.data}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
-                      tx.status === 'Aprovado' ? 'bg-green-100 text-green-800' :
-                      tx.status === 'Negado' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {tx.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.cartao}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.limite}</td>
-                </tr>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* COLUNA 1: Dados Cadastrais */}
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h4 className="font-semibold text-gray-800 border-b pb-2 mb-4">Dados Pessoais & Endereço</h4>
+            <div className="space-y-3 text-sm">
+              <div><span className="text-gray-500 block">CPF</span> <span className="font-medium">{cooperado.cpf}</span></div>
+              {cooperado.cnpj && (
+                <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                  <span className="text-gray-500 block text-xs">CNPJ Vinculado</span> 
+                  <span className="font-medium">{cooperado.cnpj}</span>
+                </div>
+              )}
+              <div><span className="text-gray-500 block">E-mail</span> <span className="font-medium">{cooperado.email}</span></div>
+              <div><span className="text-gray-500 block">Telefone</span> <span className="font-medium">{cooperado.telefone}</span></div>
+              <div className="pt-2 border-t mt-2">
+                <span className="text-gray-500 block text-xs uppercase mb-1">Endereço de Entrega Cartão</span>
+                <p className="font-medium text-gray-700">
+                  {cooperado.enderecoEntrega.logradouro}, {cooperado.enderecoEntrega.numero}<br/>
+                  {cooperado.enderecoEntrega.bairro} - {cooperado.enderecoEntrega.cidade}/{cooperado.enderecoEntrega.uf}<br/>
+                  CEP: {cooperado.enderecoEntrega.cep}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Se for CNPJ, mostra sócios */}
+          {cooperado.cnpj && cooperado.socios && (
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h4 className="font-semibold text-gray-800 border-b pb-2 mb-4">Quadro Societário</h4>
+              <ul className="space-y-3">
+                {cooperado.socios.map((socio, idx) => (
+                  <li key={idx} className="flex justify-between items-center text-sm">
+                    <span className="font-medium">{socio.nome}</span>
+                    <span className="text-gray-500 text-xs">{socio.cpf}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* COLUNA 2: Contas e Cartões */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Card de Contas Correntes */}
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h4 className="font-semibold text-gray-800 border-b pb-2 mb-4 flex items-center">
+              <Wallet className="w-5 h-5 mr-2 text-hub-teal"/> Contas Correntes
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">Banco/Ag/Conta</th>
+                    <th className="px-3 py-2">Documento</th>
+                    <th className="px-3 py-2">Abertura</th>
+                    <th className="px-3 py-2">PA</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {cooperado.contasCorrentes.map(cc => (
+                    <tr key={cc.id}>
+                      <td className="px-3 py-2 font-medium">{cc.banco} / {cc.agencia} / {cc.numero}</td>
+                      <td className="px-3 py-2 text-gray-500">{cc.documentoVinculado}</td>
+                      <td className="px-3 py-2 text-gray-500">{cc.dataAbertura}</td>
+                      <td className="px-3 py-2"><span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">{cc.paVinculado}</span></td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cc.status === 'Ativa' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {cc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {cooperado.contasCorrentes.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-gray-500">Nenhuma conta corrente direta.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Card de Cartões */}
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+             <h4 className="font-semibold text-gray-800 border-b pb-2 mb-4 flex items-center">
+              <CreditCard className="w-5 h-5 mr-2 text-hub-teal"/> Contas Cartão
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">Cartão</th>
+                    <th className="px-3 py-2">Nome Impresso</th>
+                    <th className="px-3 py-2">Função</th>
+                    <th className="px-3 py-2">Tipo</th>
+                    <th className="px-3 py-2">PA</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {cooperado.contasCartoes.map(card => (
+                    <tr key={card.id}>
+                      <td className="px-3 py-2 font-mono">{card.numeroMascarado}</td>
+                      <td className="px-3 py-2 text-gray-600 uppercase text-xs">{card.nomeImpresso}</td>
+                      <td className="px-3 py-2">{card.funcao}</td>
+                      <td className="px-3 py-2">
+                         <span className={`px-2 py-0.5 rounded text-xs ${card.tipo === 'Kids' ? 'bg-pink-100 text-pink-800' : card.tipo === 'Adicional' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100'}`}>
+                           {card.tipo}
+                         </span>
+                      </td>
+                      <td className="px-3 py-2"><span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">{card.paVinculado}</span></td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${card.status === 'Ativa' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {card.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Card de Relacionamentos (Titular/Adicional/Kids) */}
+          {(vinculados.length > 0 || paiVinculado) && (
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100">
+               <h4 className="font-semibold text-blue-800 border-b border-blue-100 pb-2 mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2"/> Vínculos Familiares / Adicionais
+              </h4>
+              
+              {/* Se eu sou Titular, mostro meus dependentes */}
+              {vinculados.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Este cooperado é titular das seguintes contas vinculadas:</p>
+                  {vinculados.map(v => (
+                    <div key={v.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <div>
+                        <p className="font-bold text-gray-800">{v.nome}</p>
+                        <p className="text-xs text-gray-500">CPF: {v.cpf}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="px-2 py-1 bg-white rounded text-xs font-semibold border text-blue-600">
+                          {v.contasCartoes.find(c => c.titularVinculadoId === cooperado.id)?.tipo || 'Vinculado'}
+                        </span>
+                        <button 
+                           onClick={() => alert(`Abrindo modal com detalhes de ${v.nome}`)}
+                           className="p-1 bg-white rounded border hover:bg-gray-100 text-blue-600"
+                        >
+                          <Eye className="w-4 h-4"/>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Se eu sou Dependente, mostro meu titular */}
+              {paiVinculado && (
+                 <div className="flex items-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 mr-3"/>
+                    <div>
+                      <p className="text-sm text-yellow-800">
+                        Esta é uma conta <strong>{cooperado.contasCartoes[0]?.tipo}</strong> vinculada ao titular:
+                      </p>
+                      <p className="font-bold text-gray-900 mt-1">{paiVinculado.nome} (CPF: {paiVinculado.cpf})</p>
+                    </div>
+                    <button 
+                       onClick={() => alert(`Abrindo modal com detalhes do titular ${paiVinculado.nome}`)}
+                       className="ml-auto p-2 bg-white rounded-full shadow-sm hover:bg-gray-50"
+                    >
+                       <Eye className="w-5 h-5 text-gray-600"/>
+                    </button>
+                 </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* Modal de Bloqueio */}
+      {showModalBloqueio && (
+        <ModalBloqueioCooperado cooperado={cooperado} onClose={() => setShowModalBloqueio(false)} />
+      )}
+    </div>
+  );
+}
+
+// --- NOVO COMPONENTE: Modal de Bloqueio Granular ---
+function ModalBloqueioCooperado({ cooperado, onClose }: { cooperado: CooperadoDetalhado; onClose: () => void }) {
+  // Estado local para gerenciar os checkboxes
+  const [contasSelecionadas, setContasSelecionadas] = useState<Record<string, boolean>>({});
+  const [cartoesSelecionados, setCartoesSelecionados] = useState<Record<string, boolean>>({});
+  const [motivo, setMotivo] = useState('');
+
+  const toggleConta = (id: string) => {
+    setContasSelecionadas(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+  
+  const toggleCartao = (id: string) => {
+    setCartoesSelecionados(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSalvarBloqueio = () => {
+    const contas = Object.keys(contasSelecionadas).filter(k => contasSelecionadas[k]);
+    const cartoes = Object.keys(cartoesSelecionados).filter(k => cartoesSelecionados[k]);
+    
+    alert(`Bloqueio Aplicado!\nContas: ${contas.join(', ')}\nCartões: ${cartoes.join(', ')}\nMotivo: ${motivo}`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center pb-4 border-b">
+          <div>
+            <h3 className="text-xl font-semibold text-red-700 flex items-center">
+              <LogOut className="w-5 h-5 mr-2"/> Bloqueio de Produtos
+            </h3>
+            <p className="text-sm text-gray-500">Selecione os produtos que deseja bloquear para {cooperado.nome}</p>
+          </div>
+          <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="space-y-6 mt-6">
+          {/* Seção Contas Correntes */}
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-2">Contas Correntes</h4>
+            <div className="space-y-2">
+              {cooperado.contasCorrentes.map(cc => (
+                <label key={cc.id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={!!contasSelecionadas[cc.id]} 
+                    onChange={() => toggleConta(cc.id)}
+                    className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
+                  />
+                  <div className="ml-3">
+                    <span className="block font-medium">Conta: {cc.numero} (Ag: {cc.agencia})</span>
+                    <span className="text-xs text-gray-500">Banco: {cc.banco} | Doc: {cc.documentoVinculado}</span>
+                  </div>
+                  <span className={`ml-auto text-xs px-2 py-1 rounded ${cc.status === 'Bloqueada' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                    Atual: {cc.status}
+                  </span>
+                </label>
               ))}
-            </tbody>
-          </table>
+              {cooperado.contasCorrentes.length === 0 && <p className="text-sm text-gray-400 italic">Nenhuma conta corrente disponível.</p>}
+            </div>
+          </div>
+
+          {/* Seção Cartões */}
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-2">Contas Cartão</h4>
+            <div className="space-y-2">
+              {cooperado.contasCartoes.map(card => (
+                <label key={card.id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={!!cartoesSelecionados[card.id]} 
+                    onChange={() => toggleCartao(card.id)}
+                    className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
+                  />
+                  <div className="ml-3">
+                    <span className="block font-medium">{card.numeroMascarado} ({card.funcao})</span>
+                    <span className="text-xs text-gray-500">Tipo: {card.tipo} | Nome: {card.nomeImpresso}</span>
+                  </div>
+                  <span className={`ml-auto text-xs px-2 py-1 rounded ${card.status === 'Bloqueada' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                    Atual: {card.status}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          {/* Motivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo do Bloqueio</label>
+            <textarea 
+              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-red-500 focus:border-red-500"
+              rows={3}
+              placeholder="Descreva o motivo da ação..."
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+            ></textarea>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-6 mt-4 border-t">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg mr-2">Cancelar</button>
+          <button 
+            onClick={handleSalvarBloqueio}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 font-medium"
+          >
+            Confirmar Bloqueio
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-
 // =======================================================================
 // 9. Componente Modal de Solicitação de Cartão (Sem alterações)
 // =======================================================================
-/* ... (Todo o código do ModalSolicitarCartao e seus sub-componentes continua o mesmo) ... */
 type ModalSolicitarCartaoProps = {
   cooperado: Cooperado;
   onClose: () => void;
 };
-type Endereco = { cep: string; rua: string; numero: string; bairro: string; cidade: string; uf: string; compl: string };
-
-function ModalSolicitarCartao({ cooperado, onClose }: ModalSolicitarCartaoProps) {
-  // ... (código idêntico)
-  const [step, setStep] = useState(1);
-  const [selectedCardId, setSelectedCardId] = useState('');
-  const [nomeNoCartao, setNomeNoCartao] = useState(cooperado.nome);
-  const [tipoEnvio, setTipoEnvio] = useState('cooperado');
-  const [outroEndereco, setOutroEndereco] = useState<Endereco>({
-    cep: '', rua: '', numero: '', bairro: '', cidade: '', uf: '', compl: ''
-  });
-
-  const dataValidade = new Date();
-  dataValidade.setFullYear(dataValidade.getFullYear() + 5);
-  const validadeFormatada = dataValidade.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
-  const cardSelecionadoInfo = mockTiposDeCartao.find(c => c.id === selectedCardId);
-
-  const proximaEtapa = () => setStep(s => s + 1);
-  const etapaAnterior = () => setStep(s => s - 1);
-
-  const renderEtapa = () => {
-    switch (step) {
-      case 1:
-        return (
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Selecione abaixo o produto desejado:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {mockTiposDeCartao.map((card) => (
-                <button
-                  key={card.id}
-                  onClick={() => setSelectedCardId(card.id)}
-                  className={`flex items-center p-4 border rounded-lg transition-all ${
-                    selectedCardId === card.id ? 'border-hub-teal ring-2 ring-hub-teal' : 'border-gray-300 hover:shadow-md'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="card-type"
-                    checked={selectedCardId === card.id}
-                    readOnly
-                    className="w-5 h-5 text-hub-teal focus:ring-hub-teal"
-                  />
-                  <span className="ml-4 text-lg font-medium">{card.nome}</span>
-                  <img src={card.img} alt={card.nome} className="w-20 ml-auto" />
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      case 2:
-        return (
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Dados do Cartão</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="nomeCartao" className="block text-sm font-medium text-gray-700">
-                    Nome do Cooperado (como ficará no cartão)
-                  </label>
-                  <input
-                    type="text"
-                    id="nomeCartao"
-                    value={nomeNoCartao}
-                    onChange={(e) => setNomeNoCartao(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-hub-teal"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="validade" className="block text-sm font-medium text-gray-700">
-                    Data de Validade (calculada)
-                  </label>
-                  <input
-                    type="text"
-                    id="validade"
-                    value={validadeFormatada}
-                    disabled
-                    className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm bg-gray-100"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-center">
-                <div className="w-64 h-40 bg-gray-800 rounded-xl p-5 flex flex-col justify-between text-white shadow-lg">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold">VISA</span>
-                    <img src={cardSelecionadoInfo?.img.replace('100x60', '80x50')} alt={cardSelecionadoInfo?.nome} />
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-sm tracking-widest">**** **** **** ****</p>
-                    <p className="text-xs mt-2">VALIDADE {validadeFormatada}</p>
-                    <p className="text-lg font-medium tracking-wider mt-1">{nomeNoCartao || 'NOME NO CARTÃO'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      case 3:
-        return (
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Dados do Envio</h3>
-            <div className="space-y-3">
-              <RadioOpcaoEnvio
-                label="Endereço do Cooperado"
-                value="cooperado"
-                checked={tipoEnvio === 'cooperado'}
-                onChange={setTipoEnvio}
-              />
-              <RadioOpcaoEnvio
-                label="Na Cooperativa"
-                value="cooperativa"
-                checked={tipoEnvio === 'cooperativa'}
-                onChange={setTipoEnvio}
-              />
-              <RadioOpcaoEnvio
-                label="No Ponto de Atendimento (PA)"
-                value="pa"
-                checked={tipoEnvio === 'pa'}
-                onChange={setTipoEnvio}
-              />
-              <RadioOpcaoEnvio
-                label="Cadastrar novo endereço de entrega"
-                value="outro"
-                checked={tipoEnvio === 'outro'}
-                onChange={setTipoEnvio}
-              />
-            </div>
-            {tipoEnvio === 'outro' && (
-              <div className="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                <h4 className="text-md font-semibold mb-3">Cadastrar Novo Endereço</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input
-                    type="text"
-                    placeholder="CEP"
-                    value={outroEndereco.cep}
-                    onChange={(e) => setOutroEndereco({...outroEndereco, cep: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm col-span-1"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Rua / Logradouro"
-                    value={outroEndereco.rua}
-                    onChange={(e) => setOutroEndereco({...outroEndereco, rua: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm col-span-2"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Número"
-                    value={outroEndereco.numero}
-                    onChange={(e) => setOutroEndereco({...outroEndereco, numero: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm col-span-1"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Complemento (Opcional)"
-                    value={outroEndereco.compl}
-                    onChange={(e) => setOutroEndereco({...outroEndereco, compl: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm col-span-2"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      case 4:
-        return (
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Revisão da Solicitação</h3>
-            <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-              <InfoRevisao label="Cooperado" value={cooperado.nome} />
-              <InfoRevisao label="Produto Selecionado" value={cardSelecionadoInfo?.nome || 'N/A'} />
-              <InfoRevisao label="Nome no Cartão" value={nomeNoCartao} />
-              <InfoRevisao label="Data de Validade" value={validadeFormatada} />
-              <InfoRevisao label="Tipo de Envio" value={
-                tipoEnvio === 'cooperado' ? 'Endereço do Cooperado' :
-                tipoEnvio === 'cooperativa' ? 'Na Cooperativa' :
-                tipoEnvio === 'pa' ? 'No Ponto de Atendimento' :
-                'Novo Endereço Cadastrado'
-              } />
-              {tipoEnvio === 'outro' && (
-                <div className="pl-6 text-sm">
-                  <p>{outroEndereco.rua}, {outroEndereco.numero} {outroEndereco.compl}</p>
-
-                  <p>{outroEndereco.cep}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      case 5:
-        return (
-          <div className="flex flex-col items-center justify-center text-center p-10">
-            <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
-            <h3 className="text-2xl font-semibold">Solicitação Enviada!</h3>
-            <p className="text-gray-600 mt-2">
-              A nova solicitação de cartão para {cooperado.nome} foi processada com sucesso.
-            </p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    // ... (código idêntico do wrapper do modal)
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-8 max-h-[90vh] flex flex-col">
-        {/* Cabeçalho */}
-        <div className="flex justify-between items-center pb-4 border-b">
-          <div>
-            <h2 className="text-2xl font-semibold">Solicitação de Cartão</h2>
-            <p className="text-sm text-gray-500">Cooperado: {cooperado.nome}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Stepper (Etapas) */}
-        <div className="flex justify-between items-center my-6">
-          <StepperStep num={1} title="Seleção do Produto" active={step === 1} completed={step > 1} />
-          <StepperLine />
-          <StepperStep num={2} title="Dados do Cartão" active={step === 2} completed={step > 2} />
-          <StepperLine />
-          <StepperStep num={3} title="Dados do Envio" active={step === 3} completed={step > 3} />
-          <StepperLine />
-          <StepperStep num={4} title="Revisão" active={step === 4} completed={step > 4} />
-          <StepperLine />
-          <StepperStep num={5} title="Confirmação" active={step === 5} completed={step > 5} />
-        </div>
-
-        {/* Conteúdo da Etapa (flex-1 para ocupar espaço e permitir scroll se necessário) */}
-        <div className="flex-1 overflow-y-auto pr-2">
-          {renderEtapa()}
-        </div>
-
-        {/* Botões de Navegação do Rodapé */}
-        <div className="flex justify-between pt-6 border-t mt-6">
-          <button
-            onClick={etapaAnterior}
-            disabled={step === 1 || step === 5}
-            className="flex items-center px-6 py-2 text-gray-700 bg-gray-200 rounded-lg shadow-sm
-                       disabled:opacity-0 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-5 h-5 mr-1" />
-            Anterior
-          </button>
-          {step < 4 && (
-             <button
-              onClick={proximaEtapa}
-              disabled={step === 1 && !selectedCardId}
-              className="flex items-center px-6 py-2 text-white rounded-lg shadow-sm disabled:opacity-50"
-              style={{ backgroundColor: HUB_BRAND_COLOR }}
-            >
-              Próximo <ChevronRight className="w-5 h-5 ml-1" />
-            </button>
-          )}
-          {step === 4 && (
-             <button
-              onClick={proximaEtapa}
-              className="flex items-center px-6 py-2 text-white bg-green-600 rounded-lg shadow-sm"
-            >
-              Confirmar Solicitação <CheckCircle className="w-5 h-5 ml-1" />
-            </button>
-          )}
-          {step === 5 && (
-             <button
-              onClick={onClose}
-              className="flex items-center px-6 py-2 text-white rounded-lg shadow-sm"
-              style={{ backgroundColor: HUB_BRAND_COLOR }}
-            >
-              Fechar
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // --- Componentes auxiliares do Modal (AGORA COM 'COMPLETED') ---
-/* ... (Todos os componentes auxiliares StepperStep, StepperLine, etc. continuam idênticos) ... */
+
 function StepperStep({ num, title, active, completed }: { num: number; title: string; active: boolean; completed?: boolean }) {
   return (
     <div className="flex flex-col items-center">
@@ -1350,193 +1415,200 @@ function InfoRevisao({ label, value }: { label: string; value: string }) {
 }
 
 // =======================================================================
-// 10. A PÁGINA DE CARTÕES (COM PROP DE USUÁRIO)
+// 10. A PÁGINA DE CARTÕES (VERSÃO UNIFICADA E CORRIGIDA)
 // =======================================================================
-/* ... (Todo o código da PaginaCartoes e seus sub-componentes continua o mesmo) ... */
+
 // --- Definição de Tipos para Cartões ---
-type CartaoStatus = 'ativo' | 'vencido' | 'bloqueado_preventivo';
+type CartaoStatus = 'ativo' | 'vencido' | 'bloqueado_preventivo' | 'cancelado';
+type CartaoFuncao = 'Credito' | 'Debito' | 'Multiplo';
+
 type Cartao = {
   id: number;
+  idCartao: string;
   cooperado: string;
+  cooperativa: string;
   conta: string;
+  numeroMascarado: string;
   tipo: string;
+  funcao: CartaoFuncao;
   bandeira: string;
   limite: number;
   disponivel: number;
   validade: string;
   status: CartaoStatus;
 };
-type ProdutoAnuidade = {
-  id: string;
-  nome: string;
+
+// --- Tipos Auxiliares ---
+type ProdutoAnuidade = { 
+  id: number; 
+  nome: string; 
+  valorTitular: number; 
+  valorAdicional: number; 
+};
+
+type RegraDesconto = { 
+  id: number; 
+  gasto: number; 
+  desconto: number; 
+  produto: string; 
+};
+
+type CustoReposicao = {
+  cooperativa: string;
   valor: number;
 };
-type RegraDesconto = {
-  id: number;
-  gasto: number;
-  desconto: number;
-  produto: string;
-};
-type ProdutoConfig = {
-  id: string;
-  nome: string;
-  multa: number;
-  mora: number;
-  juros: number;
+
+type ProdutoConfig = { 
+  id: number; 
+  nome: string; 
+  multa: number; 
+  mora: number; 
+  juros: number; // Juros Atraso
+  
+  // Novos Campos Financeiros
+  percRotativo: number;
+  percSaque: number;
+  percJurosEmissor: number;
+  percJurosCrediario: number;
+  percParcelamentoFatura: number;
+  
+  // Custo Reposição (Lista por Coop)
+  custosReposicao: CustoReposicao[];
 };
 
-// --- Dados Mockados da Página Cartões ---
-const mockKpiCartoes = {
-  ativos: 8,
-  bloqueados: 2,
-  vencidos: 2,
+type CartaoEntrega = { 
+  id: number; 
+  cooperado: string; 
+  cooperativa: string;
+  pa: string;
+  enderecoEntrega: string;
+  tipoCartao: string; 
+  status: string; 
+  dataCriacao: string; 
+  previsaoEntrega?: string; 
+  rastreio?: string; 
 };
+
+type HistoricoCartao = {
+  id: number;
+  numeroMascarado: string;
+  dataEmissao: string;
+  dataVencimento: string;
+  tipoProduto: string;
+  status: 'Ativo' | 'Vencido' | 'Cancelado' | 'Em Entrega';
+};
+
+// --- Mocks Atualizados ---
+const mockKpiCartoes = { ativos: 8, bloqueados: 2, vencidos: 2 };
+
 const mockListaDeCartoes: Cartao[] = [
-  { id: 1, cooperado: 'Fernanda Lima Santos', conta: 'CC-006-123456', tipo: 'classic', bandeira: 'VISA', limite: 6000, disponivel: 1200, validade: '12/11/2023', status: 'vencido' },
-  { id: 2, cooperado: 'Carlos Eduardo Souza', conta: 'CC-005-127456', tipo: 'gold', bandeira: 'MASTERCARD', limite: 12000, disponivel: 3600, validade: '12/11/2022', status: 'bloqueado_preventivo' },
-  { id: 3, cooperado: 'Ana Paula Ferreira', conta: 'CC-004-120456', tipo: 'infinite', bandeira: 'VISA', limite: 50000, disponivel: 20000, validade: '12/11/2031', status: 'ativo' },
-  // ... (o resto da lista de cartões)
-  { id: 4, cooperado: 'João Pedro Costa', conta: 'CC-003-125456', tipo: 'classic', bandeira: 'VISA', limite: 8000, disponivel: 4000, validade: '12/11/2030', status: 'ativo' },
-  { id: 5, cooperado: 'Maria Santos Oliveira', conta: 'CC-002-124456', tipo: 'platinum', bandeira: 'MASTERCARD', limite: 25000, disponivel: 15000, validade: '12/11/2029', status: 'ativo' },
-  { id: 6, cooperado: 'Daniel Oliveira Silva', conta: 'CC-002-123456', tipo: 'gold', bandeira: 'VISA', limite: 15000, disponivel: 10500, validade: '12/11/2028', status: 'ativo' },
-  { id: 7, cooperado: 'Ana Paula Ferreira', conta: 'CC-004-456789', tipo: 'infinite', bandeira: 'VISA', limite: 50000, disponivel: 30000, validade: '30/03/2030', status: 'ativo' },
-  { id: 8, cooperado: 'Maria Santos Oliveira', conta: 'CC-002-124567', tipo: 'platinum', bandeira: 'MASTERCARD', limite: 25000, disponivel: 15000, validade: '29/06/2029', status: 'ativo' },
+  { id: 1, idCartao: '900101', cooperado: 'Fernanda Lima Santos', cooperativa: 'Crediserv', conta: '12345-6', numeroMascarado: '4984 **** **** 1001', tipo: 'classic', funcao: 'Multiplo', bandeira: 'VISA', limite: 6000, disponivel: 1200, validade: '12/11/2023', status: 'vencido' },
+  { id: 2, idCartao: '900102', cooperado: 'Carlos Eduardo Souza', cooperativa: 'Coopesa', conta: '54321-0', numeroMascarado: '5200 **** **** 2045', tipo: 'gold', funcao: 'Credito', bandeira: 'MASTERCARD', limite: 12000, disponivel: 3600, validade: '12/11/2026', status: 'bloqueado_preventivo' },
+  { id: 3, idCartao: '900103', cooperado: 'Ana Paula Ferreira', cooperativa: 'Crediserv', conta: '99887-1', numeroMascarado: '4001 **** **** 9988', tipo: 'infinite', funcao: 'Multiplo', bandeira: 'VISA', limite: 50000, disponivel: 20000, validade: '12/11/2031', status: 'ativo' },
+  { id: 4, idCartao: '900104', cooperado: 'João Pedro Costa', cooperativa: 'Coopesa', conta: '77441-2', numeroMascarado: '4111 **** **** 1111', tipo: 'classic', funcao: 'Debito', bandeira: 'VISA', limite: 0, disponivel: 0, validade: '12/11/2030', status: 'ativo' },
+  { id: 5, idCartao: '900105', cooperado: 'Maria Santos Oliveira', cooperativa: 'Coopesa', conta: '33221-X', numeroMascarado: '5500 **** **** 5500', tipo: 'platinum', funcao: 'Credito', bandeira: 'MASTERCARD', limite: 25000, disponivel: 15000, validade: '12/11/2029', status: 'ativo' },
 ];
 
-// --- Novos Tipos para Acompanhamento de Entrega ---
-type StatusEntrega = 'Criado' | 'Em produção' | 'Em entrega' | 'Entregue';
-type CartaoEntrega = {
-  id: number;
-  cooperado: string;
-  tipoCartao: string; // ex: Visa Infinite
-  status: StatusEntrega;
-  dataCriacao: string;
-  previsaoEntrega?: string; // Apenas se estiver em entrega
-  rastreio?: string;
-};
-
-// --- Dados Mockados para Acompanhamento de Entrega ---
 const mockEntregaCartoes: CartaoEntrega[] = [
-  { id: 1, cooperado: 'Ana Beatriz Silva', tipoCartao: 'Visa Infinite', status: 'Em entrega', dataCriacao: '10/11/2025', previsaoEntrega: '20/11/2025', rastreio: 'BR123456789' },
-  { id: 2, cooperado: 'Roberto L. Souza', tipoCartao: 'Visa Gold', status: 'Em produção', dataCriacao: '14/11/2025' },
-  { id: 3, cooperado: 'Daniel C. Oliveira', tipoCartao: 'Visa Classic', status: 'Criado', dataCriacao: '16/11/2025' },
-  { id: 4, cooperado: 'Maria Santos Oliveira', tipoCartao: 'Visa Platinum', status: 'Em entrega', dataCriacao: '08/11/2025', previsaoEntrega: '18/11/2025', rastreio: 'BR987654321' },
-  { id: 5, cooperado: 'Carlos Eduardo Souza', tipoCartao: 'Visa Gold', status: 'Criado', dataCriacao: '17/11/2025' },
+  { 
+    id: 1, cooperado: 'Ana Beatriz Silva', cooperativa: 'Crediserv', pa: 'PA 05', 
+    enderecoEntrega: 'Rua das Flores, 123, Centro - SP',
+    tipoCartao: 'Visa Infinite', status: 'Em entrega', dataCriacao: '10/11/2025', previsaoEntrega: '20/11/2025', rastreio: 'BR123456789' 
+  },
+];
+
+// MOCK DO HISTÓRICO (Exemplos Variados)
+const mockHistoricoCartoes: HistoricoCartao[] = [
+  { id: 1, numeroMascarado: '4111 11** **** 9988', dataEmissao: '10/01/2025', dataVencimento: '01/2030', tipoProduto: 'Visa Infinite', status: 'Ativo' },
+  { id: 2, numeroMascarado: '4111 55** **** 5544', dataEmissao: '15/05/2024', dataVencimento: '05/2029', tipoProduto: 'Visa Platinum', status: 'Cancelado' },
+  { id: 3, numeroMascarado: '4111 22** **** 1122', dataEmissao: '20/02/2020', dataVencimento: '02/2025', tipoProduto: 'Visa Gold', status: 'Vencido' },
+  { id: 4, numeroMascarado: '4111 77** **** 7777', dataEmissao: '15/11/2025', dataVencimento: '11/2030', tipoProduto: 'Visa Infinite Metal', status: 'Em Entrega' },
 ];
 
 const mockAnuidadeProdutos: ProdutoAnuidade[] = [
-  { id: 'infinite', nome: 'Infinite', valor: 480.00 },
-  { id: 'classic', nome: 'Classic', valor: 0.00 },
-  { id: 'gold', nome: 'Gold', valor: 120.00 },
-  { id: 'platinum', nome: 'Platinum', valor: 80.00 },
-  { id: 'empresarial', nome: 'Empresarial', valor: 600.00 },
+  { id: 1, nome: 'Infinite', valorTitular: 480.00, valorAdicional: 240.00 },
+  { id: 2, nome: 'Black', valorTitular: 450.00, valorAdicional: 225.00 },
 ];
 
 const mockRegrasDesconto: RegraDesconto[] = [
-  { id: 1, gasto: 4000, desconto: 20, produto: 'Infinite' },
-  { id: 2, gasto: 50000, desconto: 70, produto: 'Infinite' },
+  { id: 1, gasto: 4000, desconto: 50, produto: 'Infinite' },
+  { id: 2, gasto: 8000, desconto: 100, produto: 'Infinite' },
 ];
 
+// MOCK DE CONFIGURAÇÕES (Gold, Empresarial, Infinite, Platinum)
 const mockConfiguracoesProduto: ProdutoConfig[] = [
-  { id: 'infinite', nome: 'Infinite', multa: 2.0, mora: 10.00, juros: 1.5 },
-  { id: 'classic', nome: 'Classic', multa: 2.0, mora: 5.00, juros: 1.0 },
-  { id: 'gold', nome: 'Gold', multa: 2.0, mora: 8.00, juros: 1.2 },
-  { id: 'platinum', nome: 'Platinum', multa: 2.0, mora: 8.00, juros: 1.2 },
-  { id: 'empresarial', nome: 'Empresarial', multa: 3.0, mora: 15.00, juros: 2.0 },
+  { 
+    id: 1, nome: 'Infinite', 
+    multa: 2.0, mora: 10.00, juros: 1.5,
+    percRotativo: 12.5, percSaque: 3.5, percJurosEmissor: 2.0, percJurosCrediario: 4.5, percParcelamentoFatura: 5.0,
+    custosReposicao: [{ cooperativa: 'Crediserv', valor: 25.00 }, { cooperativa: 'Coopesa', valor: 30.00 }]
+  },
+  { 
+    id: 2, nome: 'Platinum', 
+    multa: 2.0, mora: 10.00, juros: 1.5,
+    percRotativo: 13.5, percSaque: 4.0, percJurosEmissor: 2.2, percJurosCrediario: 4.8, percParcelamentoFatura: 5.5,
+    custosReposicao: [{ cooperativa: 'Crediserv', valor: 20.00 }, { cooperativa: 'Coopesa', valor: 25.00 }]
+  },
+  { 
+    id: 3, nome: 'Gold', 
+    multa: 2.0, mora: 10.00, juros: 1.5,
+    percRotativo: 14.5, percSaque: 4.5, percJurosEmissor: 2.5, percJurosCrediario: 5.0, percParcelamentoFatura: 6.0,
+    custosReposicao: [{ cooperativa: 'Crediserv', valor: 15.00 }, { cooperativa: 'Coopesa', valor: 15.00 }]
+  },
+  { 
+    id: 4, nome: 'Empresarial', 
+    multa: 2.0, mora: 15.00, juros: 2.0,
+    percRotativo: 11.5, percSaque: 3.0, percJurosEmissor: 1.8, percJurosCrediario: 4.0, percParcelamentoFatura: 4.5,
+    custosReposicao: [{ cooperativa: 'Crediserv', valor: 35.00 }, { cooperativa: 'Coopesa', valor: 40.00 }]
+  }
 ];
 
-// --- Componente PAI da Página Cartões (ATUALIZADO) ---
 type CartoesViewMode = 'lista' | 'upgrade' | 'anuidade_cooperado' | 'anuidade_produto' | 'configuracoes_produto' | 'acompanhar_entrega';
 
+// --- Componente PAI da Página Cartões ---
 function PaginaCartoes({ usuario }: { usuario: User }) {
   const [viewMode, setViewMode] = useState<CartoesViewMode>('lista');
 
   const renderView = () => {
     switch (viewMode) {
-      case 'lista':
-        return <ViewListaPrincipalCartoes kpis={mockKpiCartoes} cartoes={mockListaDeCartoes} />;
-      case 'acompanhar_entrega': // NOVO CASE
-        return <ViewAcompanharEntrega entregas={mockEntregaCartoes} />;
-      case 'upgrade':
-        return <ViewUpgradeDowngrade />;
-      case 'anuidade_cooperado':
-        return <ViewAnuidadeCooperado />;
-      case 'anuidade_produto':
-        return <ViewAnuidadeProduto />;
-      case 'configuracoes_produto':
-        return <ViewConfiguracoesProduto />;
-      default:
-        return <ViewListaPrincipalCartoes kpis={mockKpiCartoes} cartoes={mockListaDeCartoes} />;
+      case 'lista': return <ViewListaPrincipalCartoes kpis={mockKpiCartoes} cartoes={mockListaDeCartoes} usuario={usuario} />;
+      case 'acompanhar_entrega': return <ViewAcompanharEntrega entregas={mockEntregaCartoes} />;
+      case 'upgrade': return <ViewUpgradeDowngrade />;
+      case 'anuidade_cooperado': return <ViewAnuidadeCooperado />;
+      case 'anuidade_produto': return <ViewAnuidadeProduto />;
+      case 'configuracoes_produto': return <ViewConfiguracoesProduto />;
+      default: return <ViewListaPrincipalCartoes kpis={mockKpiCartoes} cartoes={mockListaDeCartoes} usuario={usuario} />;
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex space-x-2 border-b border-gray-200 overflow-x-auto pb-1">
-        <SubMenuButton
-          label="Gestão de Cartões"
-          active={viewMode === 'lista'}
-          onClick={() => setViewMode('lista')}
-        />
-        <SubMenuButton // NOVO BOTÃO
-          label="Acompanhar Entrega"
-          active={viewMode === 'acompanhar_entrega'}
-          onClick={() => setViewMode('acompanhar_entrega')}
-        />
-        <SubMenuButton
-          label="Upgrade/Downgrade"
-          active={viewMode === 'upgrade'}
-          onClick={() => setViewMode('upgrade')}
-        />
-        <SubMenuButton
-          label="Anuidade (Cooperado)"
-          active={viewMode === 'anuidade_cooperado'}
-          onClick={() => setViewMode('anuidade_cooperado')}
-        />
-        <SubMenuButton
-          label="Anuidade (Produto)"
-          active={viewMode === 'anuidade_produto'}
-          onClick={() => setViewMode('anuidade_produto')}
-        />
-        <SubMenuButton
-          label="Configurações"
-          active={viewMode === 'configuracoes_produto'}
-          onClick={() => setViewMode('configuracoes_produto')}
-        />
+        <SubMenuButton label="Gestão de Cartões" active={viewMode === 'lista'} onClick={() => setViewMode('lista')} />
+        <SubMenuButton label="Acompanhar Entrega" active={viewMode === 'acompanhar_entrega'} onClick={() => setViewMode('acompanhar_entrega')} />
+        <SubMenuButton label="Upgrade/Downgrade" active={viewMode === 'upgrade'} onClick={() => setViewMode('upgrade')} />
+        <SubMenuButton label="Anuidade (Cooperado)" active={viewMode === 'anuidade_cooperado'} onClick={() => setViewMode('anuidade_cooperado')} />
+        <SubMenuButton label="Anuidade (Produto)" active={viewMode === 'anuidade_produto'} onClick={() => setViewMode('anuidade_produto')} />
+        <SubMenuButton label="Configurações" active={viewMode === 'configuracoes_produto'} onClick={() => setViewMode('configuracoes_produto')} />
       </div>
-      <div>
-        {renderView()}
-      </div>
+      <div>{renderView()}</div>
     </div>
   );
 }
 
-// --- Componentes da Página Cartões ---
+// --- View 1: Lista Principal (COM CORREÇÃO DO MODAL 'OLHO') ---
+function ViewListaPrincipalCartoes({ kpis, cartoes, usuario }: { kpis: typeof mockKpiCartoes; cartoes: Cartao[]; usuario: User }) {
+  const [statusFilter, setStatusFilter] = useState('todos');
+  const [filtroCoop, setFiltroCoop] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cartaoSelecionado, setCartaoSelecionado] = useState<Cartao | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-function SubMenuButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  // ... (código idêntico)
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-3 text-sm font-medium transition-colors
-        ${active
-          ? 'border-b-2 border-hub-teal text-hub-teal'
-          : 'text-gray-500 hover:text-gray-700'
-        }
-      `}
-    >
-      {label}
-    </button>
-  );
-}
-
-// --- View 1: Lista Principal ---
-function ViewListaPrincipalCartoes({ kpis, cartoes }: { kpis: typeof mockKpiCartoes; cartoes: Cartao[] }) {
-  const [filtroTabela, setFiltroTabela] = useState('todos');
-  
   const cartoesFiltrados = cartoes.filter(c => {
-    if (filtroTabela === 'todos') return true;
-    return c.status === filtroTabela;
+    const matchText = c.cooperado.toLowerCase().includes(searchTerm.toLowerCase()) || c.idCartao.includes(searchTerm) || c.numeroMascarado.includes(searchTerm);
+    const matchStatus = statusFilter === 'todos' || c.status === statusFilter;
+    const matchCoop = filtroCoop === '' || c.cooperativa === filtroCoop;
+    return matchText && matchStatus && matchCoop;
   });
 
   return (
@@ -1546,74 +1618,74 @@ function ViewListaPrincipalCartoes({ kpis, cartoes }: { kpis: typeof mockKpiCart
         <KpiCard title="Cartões Bloqueados" value={kpis.bloqueados.toString()} change="" changeType="info" icon={ShieldAlert} />
         <KpiCard title="Cartões Vencidos" value={kpis.vencidos.toString()} change="" changeType="info" icon={AlertCircle} />
       </div>
+
       <div className="bg-white rounded-xl shadow-lg">
-        <div className="flex flex-col md:flex-row justify-between items-center p-5 border-b border-gray-200 space-y-4 md:space-y-0">
+        <div className="p-4 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Gestão de Cartões</h3>
-            <p className="text-sm text-gray-500">Consulta e gerenciamento de cartões</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative w-full max-w-sm">
-              <input
-                type="text"
-                placeholder="Buscar por cooperado, número do cartão ou conta..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Busca</label>
+            <div className="relative">
+               <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por nome, ID ou cartão..." className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm" />
+              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
             </div>
-            <button
-              className="flex-shrink-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
-              style={{ backgroundColor: HUB_BRAND_COLOR }}
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Solicitar Cartão
-            </button>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Cooperativa</label>
+            <select value={filtroCoop} onChange={(e) => setFiltroCoop(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+              <option value="">Todas</option>
+              <option value="Coopesa">Coopesa</option>
+              <option value="Crediserv">Crediserv</option>
+            </select>
+          </div>
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                <option value="todos">Todos</option>
+                <option value="ativo">Ativo</option>
+                <option value="bloqueado_preventivo">Bloqueado</option>
+                <option value="vencido">Vencido</option>
+             </select>
           </div>
         </div>
-        <div className="flex space-x-1 p-4">
-          <FiltroTabelaButton label="Todos" active={filtroTabela === 'todos'} onClick={() => setFiltroTabela('todos')} />
-          <FiltroTabelaButton label="Ativos" active={filtroTabela === 'ativo'} onClick={() => setFiltroTabela('ativo')} />
-          <FiltroTabelaButton label="Bloqueados" active={filtroTabela === 'bloqueado_preventivo'} onClick={() => setFiltroTabela('bloqueado_preventivo')} />
-          <FiltroTabelaButton label="Vencidos" active={filtroTabela === 'vencido'} onClick={() => setFiltroTabela('vencido')} />
-        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta Cartão</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bandeira</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Limite</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Validade</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                {/* CORREÇÃO: Apenas UMA coluna de ação */}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visualizar</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID / Cartão</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Limite / Disp.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {cartoesFiltrados.map((cartao) => (
                 <tr key={cartao.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cartao.cooperado}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cartao.conta}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{cartao.tipo}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cartao.bandeira}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className="font-semibold text-gray-800">{cartao.disponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                    <span className="text-xs text-gray-500"> / {cartao.limite.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cartao.validade}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
-                      cartao.status === 'ativo' ? 'bg-green-100 text-green-800' :
-                      cartao.status === 'vencido' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <div className="text-sm font-bold text-gray-800">#{cartao.idCartao}</div>
+                    <div className="text-xs text-gray-500 font-mono">{cartao.numeroMascarado}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{cartao.cooperado}</div>
+                    <div className="text-xs text-gray-500">{cartao.cooperativa} | {cartao.conta}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="font-bold text-gray-800">{cartao.limite.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                    <div className="text-xs text-green-600">{cartao.disponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${cartao.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {cartao.status.replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button className="text-hub-teal hover:text-hub-teal-dark p-2 bg-teal-50 rounded-full hover:bg-teal-100 transition-colors">
+                    <button 
+                      onClick={() => { 
+                        setCartaoSelecionado(cartao); 
+                        setModalOpen(true); 
+                      }} 
+                      className="text-hub-teal hover:text-hub-teal-dark p-2 bg-teal-50 rounded-full hover:bg-teal-100 transition-colors"
+                    >
                       <Eye className="w-5 h-5" />
                     </button>
                   </td>
@@ -1623,71 +1695,125 @@ function ViewListaPrincipalCartoes({ kpis, cartoes }: { kpis: typeof mockKpiCart
           </table>
         </div>
       </div>
+      
+      {/* RENDERIZAÇÃO DO MODAL CORRIGIDA */}
+      {modalOpen && cartaoSelecionado && (
+        <ModalDetalheCartao 
+          cartao={cartaoSelecionado} 
+          onClose={() => setModalOpen(false)} 
+          onUpdate={(novoStatus) => {
+             console.log(`Atualizando para ${novoStatus}`);
+             setModalOpen(false);
+          }} 
+        />
+      )}
     </div>
   );
 }
-// =======================================================
-// View NOVO: Acompanhar Entrega de Cartão
-// =======================================================
-function ViewAcompanharEntrega({ entregas }: { entregas: CartaoEntrega[] }) {
-  
-  const getStatusStyle = (status: StatusEntrega) => {
-    switch (status) {
-      case 'Criado': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'Em produção': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Em entrega': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Entregue': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
+// --- Componente Modal Detalhe (Garante que aparece) ---
+function ModalDetalheCartao({ cartao, onClose, onUpdate }: { cartao: Cartao; onClose: () => void; onUpdate: (s: string) => void }) {
+  const [novoStatus, setNovoStatus] = useState(cartao.status);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6">
+        <div className="flex justify-between items-center pb-4 border-b mb-4">
+          <h3 className="text-xl font-semibold text-gray-800">Detalhes do Cartão</h3>
+          <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-6">
+          {/* Bloco Visual do Cartão */}
+          <div className="col-span-2 md:col-span-1 flex justify-center items-center bg-gray-100 rounded-lg p-4">
+             <div className="w-full h-40 bg-gray-800 rounded-xl p-5 flex flex-col justify-between text-white shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-2 opacity-20"><CreditCard className="w-24 h-24" /></div>
+                <div className="flex justify-between items-center z-10">
+                  <span className="text-lg font-bold">{cartao.bandeira}</span>
+                  <span className="text-xs uppercase">{cartao.tipo}</span>
+                </div>
+                <div className="mt-4 z-10">
+                  <p className="text-sm tracking-widest font-mono">{cartao.numeroMascarado}</p>
+                  <p className="text-xs mt-2 opacity-75">VALIDADE {cartao.validade}</p>
+                  <p className="text-md font-medium tracking-wider mt-1 uppercase truncate">{cartao.cooperado}</p>
+                </div>
+             </div>
+          </div>
+
+          {/* Dados Detalhados */}
+          <div className="col-span-2 md:col-span-1 space-y-3">
+            <div><label className="text-xs text-gray-500">ID Interno</label><p className="font-medium">{cartao.idCartao}</p></div>
+            <div><label className="text-xs text-gray-500">Conta Corrente</label><p className="font-medium">{cartao.conta}</p></div>
+            <div><label className="text-xs text-gray-500">Função</label><p className="font-medium">{cartao.funcao}</p></div>
+            <div><label className="text-xs text-gray-500">Cooperativa</label><p className="font-medium">{cartao.cooperativa}</p></div>
+            <div><label className="text-xs text-gray-500">Limite Total</label><p className="font-bold text-hub-teal">{cartao.limite.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>
+          </div>
+        </div>
+
+        {/* Área de Ação (Status) */}
+        <div className="mt-8 pt-4 border-t border-gray-100">
+           <h4 className="text-sm font-bold text-gray-700 mb-2">Gerenciar Status</h4>
+           <div className="flex items-center space-x-4">
+              <select 
+                value={novoStatus} 
+                onChange={(e) => setNovoStatus(e.target.value as CartaoStatus)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 outline-none"
+              >
+                <option value="ativo">Ativo</option>
+                <option value="bloqueado_preventivo">Bloqueado Preventivo</option>
+                <option value="cancelado">Cancelado (Perda/Roubo)</option>
+              </select>
+              <button 
+                onClick={() => onUpdate(novoStatus)}
+                className="px-6 py-2 text-white rounded-md shadow hover:opacity-90 transition font-medium"
+                style={{ backgroundColor: HUB_BRAND_COLOR }}
+              >
+                Salvar Alteração
+              </button>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- View 2: Acompanhar Entrega (Mantida) ---
+function ViewAcompanharEntrega({ entregas }: { entregas: CartaoEntrega[] }) {
   return (
     <div className="bg-white rounded-xl shadow-lg">
       <div className="p-5 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">Rastreamento de Cartões</h3>
-        <p className="text-sm text-gray-500">Acompanhe o status de produção e entrega dos cartões solicitados.</p>
+        <p className="text-sm text-gray-500">Status de produção e entrega.</p>
       </div>
-      
       <div className="overflow-x-auto">
         <table className="w-full min-w-max">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cartão Solicitado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Solicitação</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Atual</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Previsão de Entrega</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cód. Rastreio</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origem (Coop/PA)</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cartão / Data</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endereço de Entrega</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status / Rastreio</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {entregas.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {item.cooperado}
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.cooperado}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <div>{item.cooperativa}</div>
+                  <div className="text-xs font-mono">{item.pa}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {item.tipoCartao}
+                  <div className="font-bold">{item.tipoCartao}</div>
+                  <div className="text-xs">Solicitado: {item.dataCriacao}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {item.dataCriacao}
+                <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={item.enderecoEntrega}>
+                  {item.enderecoEntrega}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusStyle(item.status)}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
-                  {item.status === 'Em entrega' ? (
-                    <span className="text-hub-teal">{item.previsaoEntrega}</span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                   {item.rastreio ? (
-                     <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{item.rastreio}</span>
-                   ) : '-'}
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                   <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">{item.status}</span>
+                   {item.rastreio && <div className="text-xs mt-1 font-mono text-gray-500">{item.rastreio}</div>}
                 </td>
               </tr>
             ))}
@@ -1697,116 +1823,80 @@ function ViewAcompanharEntrega({ entregas }: { entregas: CartaoEntrega[] }) {
     </div>
   );
 }
-function FiltroTabelaButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  // ... (código idêntico)
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-        active ? 'bg-hub-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
 
-// --- View 2: Upgrade/Downgrade ---
+// --- View 3: Upgrade/Downgrade (CORRIGIDO: Botão Buscar e Histórico Completo) ---
 function ViewUpgradeDowngrade() {
-  // ... (código idêntico)
-  return (
-    <div className="p-8 bg-white rounded-xl shadow-lg">
-      <h3 className="text-xl font-semibold text-gray-800">Solicitar Upgrade ou Downgrade</h3>
-      <p className="text-sm text-gray-500 mt-1 mb-4">Busque pelo cooperado para iniciar a solicitação.</p>
-      <div className="relative w-full max-w-md">
-        <input
-          type="text"
-          placeholder="Buscar por nome, CPF ou e-mail..."
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
-        />
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-      </div>
-    </div>
-  );
-}
-
-// --- View 3: Anuidade por Cooperado ---
-function ViewAnuidadeCooperado() {
-  // ... (código idêntico)
   const [searchTerm, setSearchTerm] = useState('');
-  const [cooperadoEncontrado, setCooperadoEncontrado] = useState<Cooperado | null>(null);
-  const [anuidade, setAnuidade] = useState(0);
-  const [editMode, setEditMode] = useState(false);
+  const [cooperadoEncontrado, setCooperadoEncontrado] = useState(false);
 
-  const handleSearch = () => {
-    const cooperado = mockCooperados.find(c => c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || c.cpf.includes(searchTerm));
-    if (cooperado) {
-      setCooperadoEncontrado(cooperado);
-      setAnuidade(480.00); 
-    } else {
-      setCooperadoEncontrado(null);
+  const handleSearch = () => { if (searchTerm.length > 3) setCooperadoEncontrado(true); };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Ativo': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Vencido': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Cancelado': return 'bg-gray-100 text-gray-600 border-gray-200';
+      case 'Em Entrega': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-50 text-gray-800';
     }
   };
 
   return (
-    <div className="p-8 bg-white rounded-xl shadow-lg">
-      <h3 className="text-xl font-semibold text-gray-800">Gestão de Anuidade por Cooperado</h3>
-      <p className="text-sm text-gray-500 mt-1 mb-4">Busque pelo cooperado para gerenciar a anuidade.</p>
-      <div className="flex space-x-2">
-        <input
-          type="text"
-          placeholder="Buscar por nome ou CPF..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-md pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
-        />
-        <button onClick={handleSearch} className="px-4 py-2 text-white bg-hub-teal rounded-lg shadow-sm">
-          <Search className="w-5 h-5" />
-        </button>
+    <div className="space-y-6">
+      <div className="p-8 bg-white rounded-xl shadow-lg">
+        <h3 className="text-xl font-semibold text-gray-800">Solicitar Upgrade ou Downgrade</h3>
+        <div className="flex space-x-2 max-w-lg mt-4">
+          <input 
+            type="text" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            placeholder="Buscar por nome ou CPF..." 
+            className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal" 
+          />
+          <button 
+            onClick={handleSearch} 
+            className="px-4 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition"
+            style={{ backgroundColor: HUB_BRAND_COLOR }}
+          >
+            Buscar
+          </button>
+        </div>
       </div>
 
       {cooperadoEncontrado && (
-        <div className="mt-6 border-t pt-6">
-          <h4 className="text-lg font-semibold">{cooperadoEncontrado.nome}</h4>
-          <p className="text-sm text-gray-500">CPF: {cooperadoEncontrado.cpf}</p>
-          
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Produto Atual</p>
-              <p className="text-lg font-semibold">Visa Infinite</p>
-            </div>
-            <div className="w-px bg-gray-300 h-10 mx-4"></div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Anuidade Atual (Anual)</p>
-              {editMode ? (
-                <div className="flex items-center">
-                  <span className="text-lg font-semibold mr-1">R$</span>
-                  <input 
-                    type="number"
-                    value={anuidade}
-                    onChange={(e) => setAnuidade(parseFloat(e.target.value))}
-                    className="w-32 px-2 py-1 border border-hub-teal rounded-md"
-                  />
-                </div>
-              ) : (
-                <p className="text-lg font-semibold">{anuidade.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-              )}
-            </div>
-            {editMode ? (
-              <button
-                onClick={() => setEditMode(false)}
-                className="flex items-center px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm"
-              >
-                <Save className="w-5 h-5 mr-2" /> Salvar
-              </button>
-            ) : (
-              <button
-                onClick={() => setEditMode(true)}
-                className="flex items-center px-4 py-2 text-white bg-hub-teal rounded-lg shadow-sm"
-              >
-                <Edit2 className="w-5 h-5 mr-2" /> Editar
-              </button>
-            )}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in">
+          <div className="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h4 className="text-lg font-bold text-gray-800">Histórico de Cartões - Ana Beatriz Silva</h4>
+            <button 
+              className="flex items-center px-4 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition"
+              style={{ backgroundColor: HUB_BRAND_COLOR }}
+            >
+              <ArrowDownUp className="w-4 h-4 mr-2" /> Nova Solicitação
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max">
+              <thead className="bg-white border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emissão</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {mockHistoricoCartoes.map((hist) => (
+                  <tr key={hist.id}>
+                    <td className="px-6 py-4 text-sm font-medium">{hist.tipoProduto}</td>
+                    <td className="px-6 py-4 text-sm font-mono">{hist.numeroMascarado}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{hist.dataEmissao}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{hist.dataVencimento}</td>
+                    <td className="px-6 py-4"><span className={`px-3 py-1 inline-flex text-xs font-bold rounded-full border ${getStatusBadge(hist.status)}`}>{hist.status.toUpperCase()}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1814,178 +1904,260 @@ function ViewAnuidadeCooperado() {
   );
 }
 
-// --- View 4: Anuidade por Produto ---
+// --- View 4: Anuidade (Cooperado) (CORRIGIDO: Botões e Campos) ---
+function ViewAnuidadeCooperado() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cooperado, setCooperado] = useState<any | null>(null);
+
+  const handleSearch = () => {
+    if (searchTerm) setCooperado({ 
+      nome: 'Ana Beatriz Silva', cpf: '123.***.***-00', produto: 'Visa Infinite',
+      dataCobranca: '10/01/2025', parcelas: 12, totalContratado: 480.00, valorPendente: 360.00 
+    });
+  };
+
+  return (
+    <div className="p-8 bg-white rounded-xl shadow-lg">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">Gestão de Anuidade por Cooperado</h3>
+      <div className="flex space-x-2 mb-6">
+        <input 
+          type="text" 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          placeholder="Buscar por nome ou CPF..." 
+          className="w-full max-w-md pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal" 
+        />
+        <button 
+          onClick={handleSearch} 
+          className="px-4 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition"
+          style={{ backgroundColor: HUB_BRAND_COLOR }}
+        >
+          <Search className="w-5 h-5" />
+        </button>
+      </div>
+
+      {cooperado && (
+        <div className="border rounded-lg p-6 bg-gray-50">
+          <div className="flex justify-between items-start border-b pb-4 mb-4">
+             <div><h4 className="text-lg font-bold text-gray-800">{cooperado.nome}</h4><p className="text-sm text-gray-500">{cooperado.cpf}</p></div>
+             <div className="text-right">
+               <span className="text-white text-xs px-2 py-1 rounded" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+                 {cooperado.produto}
+               </span>
+             </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div><label className="text-xs text-gray-500 uppercase">Data Cobrança</label><p className="font-medium">{cooperado.dataCobranca}</p></div>
+             <div><label className="text-xs text-gray-500 uppercase">Parcelamento</label><p className="font-medium">{cooperado.parcelas}x</p></div>
+             <div><label className="text-xs text-gray-500 uppercase">Total Contratado</label><p className="font-bold text-green-700">R$ {cooperado.totalContratado.toFixed(2)}</p></div>
+             <div><label className="text-xs text-gray-500 uppercase">Valor Pendente</label><p className="font-bold text-red-700">R$ {cooperado.valorPendente.toFixed(2)}</p></div>
+          </div>
+          <div className="mt-6 flex justify-end">
+             <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-100 text-gray-700">
+               <Edit2 className="w-4 h-4 mr-2"/> Renegociar
+             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- View 5: Anuidade Produto (CORRIGIDO: Botões + e Save) ---
 function ViewAnuidadeProduto() {
   const [anuidades, setAnuidades] = useState(mockAnuidadeProdutos);
   const [regras, setRegras] = useState(mockRegrasDesconto);
 
-  const handleAnuidadeChange = (id: string, valor: number) => {
-    setAnuidades(anuidades.map(a => a.id === id ? { ...a, valor } : a));
+  const handleAnuidadeChange = (id: number, campo: 'valorTitular' | 'valorAdicional', valor: number) => {
+    setAnuidades(anuidades.map(a => a.id === id ? { ...a, [campo]: valor } : a));
   };
-  
-  const handleRegraChange = (id: number, campo: 'gasto' | 'desconto', valor: number) => {
-    setRegras(regras.map(r => r.id === id ? { ...r, [campo]: valor } : r));
+
+  const addRegra = () => {
+    setRegras([...regras, { id: Date.now(), gasto: 0, desconto: 0, produto: 'Selecione...' }]);
+  };
+
+  const addProduto = () => {
+    setAnuidades([...anuidades, { id: Date.now(), nome: 'Novo Produto', valorTitular: 0, valorAdicional: 0 }]);
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="p-8 bg-white rounded-xl shadow-lg">
-        <h3 className="text-xl font-semibold text-gray-800">Gestão de Anuidade por Produto</h3>
-        <p className="text-sm text-gray-500 mt-1 mb-4">Defina o valor base da anuidade para cada produto.</p>
+        <div className="flex justify-between items-center mb-4">
+           <h3 className="text-xl font-semibold text-gray-800">Anuidade Base por Produto</h3>
+           <button 
+             onClick={addProduto} 
+             className="p-2 text-white rounded-full shadow-sm hover:opacity-90 transition"
+             style={{ backgroundColor: HUB_BRAND_COLOR }}
+             title="Adicionar Produto"
+           >
+             <Plus className="w-5 h-5" />
+           </button>
+        </div>
         <div className="space-y-4">
           {anuidades.map(prod => (
-            <div key={prod.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-lg font-medium text-gray-800">{prod.nome}</span>
-              <div className="flex items-center">
-                <span className="text-lg font-semibold mr-1">R$</span>
-                <input 
-                  type="number"
-                  value={prod.valor}
-                  onChange={(e) => handleAnuidadeChange(prod.id, parseFloat(e.target.value))}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-hub-teal"
-                />
+            <div key={prod.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="text-lg font-medium text-gray-800 mb-3">{prod.nome}</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Valor Titular (R$)</label>
+                  <input type="number" value={prod.valorTitular} onChange={(e) => handleAnuidadeChange(prod.id, 'valorTitular', parseFloat(e.target.value))} className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-hub-teal outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Valor Adicional (R$)</label>
+                  <input type="number" value={prod.valorAdicional} onChange={(e) => handleAnuidadeChange(prod.id, 'valorAdicional', parseFloat(e.target.value))} className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-hub-teal outline-none" />
+                </div>
               </div>
             </div>
           ))}
-          <button className="w-full flex items-center justify-center px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm">
-            <Save className="w-5 h-5 mr-2" /> Salvar Anuidades
+          <button className="w-full px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 transition">
+            <Save className="w-5 h-5 inline mr-2" /> Salvar Anuidades
           </button>
         </div>
       </div>
 
       <div className="p-8 bg-white rounded-xl shadow-lg">
-        <h3 className="text-xl font-semibold text-gray-800">Regras de Desconto por Gasto</h3>
-        <p className="text-sm text-gray-500 mt-1 mb-4">Configure descontos automáticos baseados no gasto mensal.</p>
-        <div className="space-y-4">
-          {regras.map(regra => (
-            <div key={regra.id} className="flex flex-col sm:flex-row items-center justify-between p-3 bg-gray-50 rounded-lg gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-800 text-sm">Gasto de</span>
-                <input 
-                  type="number"
-                  value={regra.gasto}
-                  onChange={(e) => handleRegraChange(regra.id, 'gasto', parseFloat(e.target.value))}
-                  className="w-20 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                />
-                <span className="text-gray-800 text-sm">gera</span>
+        <div className="flex justify-between items-center mb-4">
+           <h3 className="text-xl font-semibold text-gray-800">Regras de Desconto</h3>
+           <button 
+             onClick={addRegra} 
+             className="p-2 text-white rounded-full shadow-sm hover:opacity-90 transition"
+             style={{ backgroundColor: HUB_BRAND_COLOR }}
+             title="Adicionar Regra"
+           >
+             <Plus className="w-5 h-5" />
+           </button>
+        </div>
+        <div className="space-y-2">
+          {regras.map((regra, idx) => (
+            <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+              <div className="flex-1">
+                 <label className="text-[10px] text-gray-500 block">Gasto Mensal</label>
+                 <input type="number" value={regra.gasto} className="w-full px-1 border rounded text-sm focus:ring-1 focus:ring-hub-teal outline-none" onChange={(e) => { const newRegras = [...regras]; newRegras[idx].gasto = parseFloat(e.target.value); setRegras(newRegras); }} />
               </div>
-              
-              <div className="flex items-center gap-2">
-                <input 
-                  type="number"
-                  value={regra.desconto}
-                  onChange={(e) => handleRegraChange(regra.id, 'desconto', parseFloat(e.target.value))}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                />
-                {/* AQUI ESTÁ O TEXTO QUE VOCÊ PEDIU */}
-                <span className="text-gray-800 text-xs leading-tight max-w-[120px]">
-                  % de desconto na anuidade (mensal)
-                </span>
-                <span className="text-sm font-bold text-hub-teal">{regra.produto}</span>
+              <div className="w-20">
+                 <label className="text-[10px] text-gray-500 block">Desc (%)</label>
+                 <input type="number" value={regra.desconto} className="w-full px-1 border rounded text-sm focus:ring-1 focus:ring-hub-teal outline-none" onChange={(e) => { const newRegras = [...regras]; newRegras[idx].desconto = parseFloat(e.target.value); setRegras(newRegras); }} />
+              </div>
+              <div className="flex-1">
+                 <label className="text-[10px] text-gray-500 block">Produto</label>
+                 <input type="text" value={regra.produto} className="w-full px-1 border rounded text-sm focus:ring-1 focus:ring-hub-teal outline-none" onChange={(e) => { const newRegras = [...regras]; newRegras[idx].produto = e.target.value; setRegras(newRegras); }} />
               </div>
             </div>
           ))}
-           <button className="w-full flex items-center justify-center px-4 py-2 text-white bg-green-600 rounded-lg shadow-sm">
-            <Save className="w-5 h-5 mr-2" /> Salvar Regras
+          <button className="w-full px-4 py-2 mt-4 text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 transition">
+            <Save className="w-5 h-5 inline mr-2" /> Salvar Regras
           </button>
         </div>
       </div>
     </div>
   );
 }
-      
-// --- View 5: Configurações do Produto ---
+
+// --- View 6: Configurações do Produto (CORRIGIDO: Botão + e Todos Campos) ---
 function ViewConfiguracoesProduto() {
-  // ... (código idêntico)
   const [configs, setConfigs] = useState(mockConfiguracoesProduto);
 
-  const handleConfigChange = (
-    id: string,
-    campo: 'multa' | 'mora' | 'juros',
-    valor: string
-  ) => {
-    const novoValor = parseFloat(valor) || 0;
-    setConfigs(configs.map(c =>
-      c.id === id ? { ...c, [campo]: novoValor } : c
-    ));
+  const updateVal = (id: number, field: keyof ProdutoConfig, val: string) => {
+    setConfigs(configs.map(c => c.id === id ? { ...c, [field]: parseFloat(val) || 0 } : c));
+  };
+
+  const addConfig = () => {
+    setConfigs([...configs, {
+      id: Date.now(), nome: 'Novo Produto', multa: 0, mora: 0, juros: 0,
+      percRotativo: 0, percSaque: 0, percJurosEmissor: 0, percJurosCrediario: 0, percParcelamentoFatura: 0,
+      custosReposicao: [{ cooperativa: 'Padrão', valor: 0 }]
+    }]);
   };
 
   return (
     <div className="space-y-6">
-      <div className="p-8 bg-white rounded-xl shadow-lg">
-        <h3 className="text-xl font-semibold text-gray-800">Configurações de Encargos do Produto</h3>
-        <p className="text-sm text-gray-500 mt-1 mb-4">
-          Defina os valores de multa, mora e juros para cada produto de cartão.
-        </p>
+      <div className="p-8 bg-white rounded-xl shadow-lg flex justify-between items-center">
+        <div>
+           <h3 className="text-xl font-semibold text-gray-800">Configurações Financeiras por Produto</h3>
+           <p className="text-sm text-gray-500">Defina as taxas e custos para Gold, Platinum, Infinite e Empresarial.</p>
+        </div>
+        <button 
+          onClick={addConfig} 
+          className="p-2 text-white rounded-full shadow-sm hover:opacity-90 transition"
+          style={{ backgroundColor: HUB_BRAND_COLOR }}
+          title="Adicionar Produto"
+        >
+          <Plus className="w-6 h-6"/>
+        </button>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {configs.map((produto) => (
-          <div key={produto.id} className="p-6 bg-white rounded-xl shadow-lg">
-            <h4 className="text-lg font-semibold text-hub-teal">{produto.nome}</h4>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor={`multa-${produto.id}`} className="block text-sm font-medium text-gray-700">
-                  Multa (%)
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    type="number"
-                    id={`multa-${produto.id}`}
-                    value={produto.multa}
-                    onChange={(e) => handleConfigChange(produto.id, 'multa', e.target.value)}
-                    className="w-full pl-4 pr-7 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-hub-teal"
-                  />
-                  <span className="absolute inset-y-0 right-3 flex items-center text-gray-500 text-sm">%</span>
-                </div>
-              </div>
-              <div>
-                <label htmlFor={`mora-${produto.id}`} className="block text-sm font-medium text-gray-700">
-                  Mora (R$)
-                </label>
-                <div className="relative mt-1">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-gray-500 text-sm">R$</span>
-                  <input
-                    type="number"
-                    id={`mora-${produto.id}`}
-                    value={produto.mora}
-                    onChange={(e) => handleConfigChange(produto.id, 'mora', e.target.value)}
-                    className="w-full pl-9 pr-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-hub-teal"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor={`juros-${produto.id}`} className="block text-sm font-medium text-gray-700">
-                  Juros (a.m. %)
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    type="number"
-                    id={`juros-${produto.id}`}
-                    value={produto.juros}
-                    onChange={(e) => handleConfigChange(produto.id, 'juros', e.target.value)}
-                    className="w-full pl-4 pr-7 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-hub-teal"
-                  />
-                  <span className="absolute inset-y-0 right-3 flex items-center text-gray-500 text-sm">%</span>
-                </div>
-              </div>
+      
+      <div className="space-y-6">
+        {configs.map((prod) => (
+          <div key={prod.id} className="p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+            <div className="flex items-center mb-4">
+               <div className="p-2 rounded mr-3 text-white" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+                 <CreditCard className="w-5 h-5"/> 
+               </div>
+               <h4 className="text-lg font-bold text-gray-800 uppercase">{prod.nome}</h4>
+            </div>
+            
+            {/* Taxas Gerais */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+               <div><label className="text-xs text-gray-500 font-bold block mb-1">Multa (%)</label><input type="number" value={prod.multa} onChange={(e) => updateVal(prod.id, 'multa', e.target.value)} className="w-full border rounded p-2 bg-gray-50" /></div>
+               <div><label className="text-xs text-gray-500 font-bold block mb-1">Mora (R$)</label><input type="number" value={prod.mora} onChange={(e) => updateVal(prod.id, 'mora', e.target.value)} className="w-full border rounded p-2 bg-gray-50" /></div>
+               <div><label className="text-xs text-gray-500 font-bold block mb-1">Juros Rotativo (%)</label><input type="number" value={prod.percRotativo} onChange={(e) => updateVal(prod.id, 'percRotativo', e.target.value)} className="w-full border rounded p-2 bg-gray-50" /></div>
+               <div><label className="text-xs text-gray-500 font-bold block mb-1">Taxa Saque (%)</label><input type="number" value={prod.percSaque} onChange={(e) => updateVal(prod.id, 'percSaque', e.target.value)} className="w-full border rounded p-2 bg-gray-50" /></div>
+               <div><label className="text-xs text-gray-500 font-bold block mb-1">Juros Parc. Fatura (%)</label><input type="number" value={prod.percParcelamentoFatura} onChange={(e) => updateVal(prod.id, 'percParcelamentoFatura', e.target.value)} className="w-full border rounded p-2 bg-gray-50" /></div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+               <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                 <label className="text-xs text-blue-800 font-bold block mb-1">Juros Emissor (%)</label>
+                 <input type="number" value={prod.percJurosEmissor} onChange={(e) => updateVal(prod.id, 'percJurosEmissor', e.target.value)} className="w-full border rounded p-2" />
+               </div>
+               <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                 <label className="text-xs text-blue-800 font-bold block mb-1">Juros Crediário (%)</label>
+                 <input type="number" value={prod.percJurosCrediario} onChange={(e) => updateVal(prod.id, 'percJurosCrediario', e.target.value)} className="w-full border rounded p-2" />
+               </div>
+            </div>
+
+            {/* Custo de Reposição por Cooperativa */}
+            <div className="mt-4">
+               <div className="flex justify-between items-center mb-2">
+                  <h5 className="text-sm font-bold text-gray-700">Valor de Reposição de Cartão (Por Cooperativa)</h5>
+                  <button className="text-xs font-bold hover:underline" style={{ color: HUB_BRAND_COLOR }}>+ Adicionar Coop</button>
+               </div>
+               <div className="bg-gray-50 border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-200 text-gray-600"><tr><th className="p-2 font-bold">Cooperativa</th><th className="p-2 font-bold">Valor (R$)</th></tr></thead>
+                    <tbody>
+                      {prod.custosReposicao.map((custo, idx) => (
+                        <tr key={idx} className="border-t border-gray-200">
+                          <td className="p-2">{custo.cooperativa}</td>
+                          <td className="p-2"><input type="number" defaultValue={custo.valor} className="w-24 border rounded p-1 bg-white" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+               </div>
             </div>
           </div>
         ))}
-      </div>
-      <div className="flex justify-end">
-         <button className="w-full md:w-auto flex items-center justify-center px-6 py-3 text-white bg-green-600 rounded-lg shadow-sm">
-          <Save className="w-5 h-5 mr-2" /> Salvar Todas as Configurações
-        </button>
+        <div className="flex justify-end pb-8">
+           <button className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 flex items-center"><Save className="w-5 h-5 mr-2"/> Salvar Todas as Configurações</button>
+        </div>
       </div>
     </div>
   );
 }
 
+function SubMenuButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${active ? 'border-b-2 border-hub-teal text-hub-teal' : 'text-gray-500 hover:text-gray-700'}`}>
+      {label}
+    </button>
+  );
+}
+// =======================================================================
+// 11. A PÁGINA DE TRANSAÇÕES (ATUALIZADA COM LIMITE DISPONÍVEL)
+// =======================================================================
 
-// =======================================================================
-// 11. A PÁGINA DE TRANSAÇÕES (COM PROP DE USUÁRIO)
-// =======================================================================
-/* ... (Todo o código da PaginaTransacoes e seus sub-componentes continua o mesmo) ... */
 // --- Definição de Tipos para Transações ---
 type KpiTransacoes = {
   total: number;
@@ -1993,42 +2165,93 @@ type KpiTransacoes = {
   negadas: number;
   volume: number;
 };
-type TransacaoStatus = 'aprovada' | 'negada' | 'pendente';
+
+type TransacaoStatus = 'aprovada' | 'reprovada';
+type ModalidadeTransacao = 'Debito' | 'Credito';
+type PlanoVenda = 'A Vista' | 'Parcelado Emissor' | 'Parcelado Crediario' | '-';
+
 type TransacaoDetalhe = {
   id: number;
-  data: string;
+  dataHora: string; // Formato DD/MM/YYYY HH:mm
   cooperado: string;
-  tipo: string;
-  estabelecimento: string;
-  forma: string;
+  
+  // Novos Campos Solicitados
+  modalidade: ModalidadeTransacao;
+  planoVenda: PlanoVenda;
+  parcelas?: number; // Ex: 12
+  
+  numeroCartaoMascarado: string; // 6 primeiros + 4 últimos
+  idCartao: string;
+  contaCorrente: string;
+  
+  cooperativa: string;
+  pa: string;
+  
   valor: number;
+  limiteDisponivelMomento: number; // NOVO CAMPO SOLICITADO
   status: TransacaoStatus;
+  motivoReprovacao?: string; // "-" se aprovada
+  
+  // Campos Detalhes
+  estabelecimento: string;
+  formaPagamento: string; // Chip, Contactless, Online
   nsu: string;
+  codigoAutorizacao: string;
+  mcc: string; // Categoria do estabelecimento
 };
 
 // --- Dados Mockados da Página Transações ---
 const mockKpiTransacoes: KpiTransacoes = {
-  total: 30,
-  aprovadas: 24,
-  negadas: 6,
-  volume: 7000,
+  total: 452,
+  aprovadas: 410,
+  negadas: 42,
+  volume: 154300.50,
 };
 
 const mockListaDeTransacoes: TransacaoDetalhe[] = [
-  { id: 1, data: '13/11/2025 00:00', cooperado: 'Daniel Oliveira Silva', tipo: 'Compra', estabelecimento: 'Supermercado Extra', forma: 'chip', valor: 57.85, status: 'aprovada', nsu: '000123456789' },
-  { id: 2, data: '13/11/2025 00:00', cooperado: 'Fernanda Lima Santos', tipo: 'Compra', estabelecimento: 'Supermercado Extra', forma: 'chip', valor: 208.31, status: 'aprovada', nsu: '000123456789' },
-  { id: 3, data: '13/11/2025 00:00', cooperado: 'Maria Santos Oliveira', tipo: 'Compra', estabelecimento: 'Supermercado Extra', forma: 'chip', valor: 89.95, status: 'aprovada', nsu: '000123456789' },
-  { id: 4, data: '13/11/2025 00:00', cooperado: 'Carlos Eduardo Souza', tipo: 'Compra', estabelecimento: 'Supermercado Extra', forma: 'chip', valor: 200.29, status: 'aprovada', nsu: '000123456789' },
-  { id: 5, data: '13/11/2025 00:00', cooperado: 'João Pedro Costa', tipo: 'Compra', estabelecimento: 'Supermercado Extra', forma: 'chip', valor: 205.35, status: 'aprovada', nsu: '000123456789' },
-  { id: 6, data: '11/11/2025 00:00', cooperado: 'Daniel Oliveira Silva', tipo: 'Saque', estabelecimento: 'Padaria Pão Quente', forma: 'aproximacao', valor: 212.30, status: 'negada', nsu: '000123456790' },
-  { id: 7, data: '11/11/2025 00:00', cooperado: 'Fernanda Lima Santos', tipo: 'Saque', estabelecimento: 'Padaria Pão Quente', forma: 'aproximacao', valor: 170.80, status: 'aprovada', nsu: '000123456790' },
+  { 
+    id: 1, dataHora: '17/11/2025 14:30', cooperado: 'Ana Beatriz Silva', 
+    modalidade: 'Credito', planoVenda: 'Parcelado Emissor', parcelas: 10,
+    numeroCartaoMascarado: '411111 ****** 1111', idCartao: '900103', contaCorrente: '12345-6',
+    cooperativa: 'Crediserv', pa: 'PA 05',
+    valor: 2500.00, limiteDisponivelMomento: 18000.00, // Limite era alto
+    status: 'aprovada', motivoReprovacao: '-',
+    estabelecimento: 'Magalu E-commerce', formaPagamento: 'Online/Token', nsu: '123456', codigoAutorizacao: 'AUT889', mcc: '5732'
+  },
+  { 
+    id: 2, dataHora: '17/11/2025 12:15', cooperado: 'Carlos Eduardo Souza', 
+    modalidade: 'Debito', planoVenda: 'A Vista', parcelas: 1,
+    numeroCartaoMascarado: '550000 ****** 2045', idCartao: '900102', contaCorrente: '54321-0',
+    cooperativa: 'Coopesa', pa: 'PA 03',
+    valor: 45.90, limiteDisponivelMomento: 3400.50, // Saldo em conta (exemplo para débito)
+    status: 'aprovada', motivoReprovacao: '-',
+    estabelecimento: 'Padaria Pão Quente', formaPagamento: 'Contactless', nsu: '654321', codigoAutorizacao: 'AUT112', mcc: '5462'
+  },
+  { 
+    id: 3, dataHora: '16/11/2025 19:40', cooperado: 'Fernanda Lima Santos', 
+    modalidade: 'Credito', planoVenda: 'A Vista', parcelas: 1,
+    numeroCartaoMascarado: '498400 ****** 1001', idCartao: '900101', contaCorrente: '99887-1',
+    cooperativa: 'Crediserv', pa: 'PA 05',
+    valor: 12000.00, limiteDisponivelMomento: 1500.00, // Limite insuficiente
+    status: 'reprovada', motivoReprovacao: 'Saldo Insuficiente',
+    estabelecimento: 'Joalheria Ouro Fino', formaPagamento: 'Chip/Senha', nsu: '789012', codigoAutorizacao: '-', mcc: '5944'
+  },
+  { 
+    id: 4, dataHora: '16/11/2025 10:00', cooperado: 'João Pedro Costa', 
+    modalidade: 'Credito', planoVenda: 'Parcelado Crediario', parcelas: 24,
+    numeroCartaoMascarado: '411100 ****** 9988', idCartao: '900104', contaCorrente: '77441-2',
+    cooperativa: 'Coopesa', pa: 'PA 04',
+    valor: 5400.00, limiteDisponivelMomento: 10000.00,
+    status: 'aprovada', motivoReprovacao: '-',
+    estabelecimento: 'Material de Construção Silva', formaPagamento: 'Chip/Senha', nsu: '345678', codigoAutorizacao: 'AUT777', mcc: '5211'
+  },
 ];
 
 const categoriasContestacao = [
   "Desacordo comercial - Cartão presente (chip / senha)",
   "Desacordo comercial - Cartão não-presente (compra e-commerce / APP / CVV2)",
   "Erro de Processamento",
-  "Não reconhecida - Cartão Não-Presente (Compra e-commerce / APP / CVV2)",
+  "Não reconhecida - Cartão Não-Presente",
   "Saque - Cédulas não liberadas",
   "Não reconhecido",
 ];
@@ -2037,7 +2260,6 @@ const categoriasContestacao = [
 type TransacoesViewMode = 'lista' | 'contestar';
 
 function PaginaTransacoes({ usuario }: { usuario: User }) {
-  // ... (código idêntico)
   const [viewMode, setViewMode] = useState<TransacoesViewMode>('lista');
 
   const renderView = () => {
@@ -2065,79 +2287,267 @@ function PaginaTransacoes({ usuario }: { usuario: User }) {
           onClick={() => setViewMode('contestar')}
         />
       </div>
-      <div>
-        {renderView()}
-      </div>
+      <div>{renderView()}</div>
     </div>
   );
 }
 
 // --- View 1: Lista Principal de Transações ---
 function ViewListaTransacoes({ kpis, transacoes }: { kpis: KpiTransacoes; transacoes: TransacaoDetalhe[] }) {
-  // ... (código idêntico)
+  // Filtros
+  const [filtroCoop, setFiltroCoop] = useState('');
+  const [filtroPA, setFiltroPA] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Modal Detalhes
+  const [transacaoSelecionada, setTransacaoSelecionada] = useState<TransacaoDetalhe | null>(null);
+
+  // Lógica de Filtragem
+  const transacoesFiltradas = transacoes.filter(tx => {
+    // Busca Textual (Nome, Cartão, ID Cartão, Conta)
+    const matchSearch = 
+      tx.cooperado.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tx.numeroCartaoMascarado.includes(searchTerm) ||
+      tx.idCartao.includes(searchTerm) ||
+      tx.contaCorrente.includes(searchTerm);
+
+    // Filtro Coop
+    const matchCoop = filtroCoop === '' || tx.cooperativa === filtroCoop;
+    
+    // Filtro PA
+    const matchPA = filtroPA === '' || tx.pa === filtroPA;
+
+    // Filtro Data (Lógica simples de string para o Mock DD/MM/YYYY)
+    let matchData = true;
+    if (dataInicio && dataFim) {
+        matchData = true; // Simplificado para o exemplo
+    }
+
+    return matchSearch && matchCoop && matchPA && matchData;
+  });
+
   return (
     <div className="space-y-6">
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <KpiCard title="Total Transações" value={kpis.total.toString()} change="" changeType="info" icon={List} />
         <KpiCard title="Aprovadas" value={kpis.aprovadas.toString()} change="" changeType="info" icon={CheckCircle2} />
-        <KpiCard title="Negadas" value={kpis.negadas.toString()} change="" changeType="info" icon={XCircle} />
+        <KpiCard title="Reprovadas" value={kpis.negadas.toString()} change="" changeType="info" icon={XCircle} />
         <KpiCard title="Volume Total" value={kpis.volume.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} change="" changeType="info" icon={BarChart2} />
       </div>
+
       <div className="bg-white rounded-xl shadow-lg">
         <div className="flex flex-col md:flex-row justify-between items-center p-5 border-b border-gray-200 space-y-4 md:space-y-0">
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Transações</h3>
-            <p className="text-sm text-gray-500">Histórico completo de transações</p>
+            <p className="text-sm text-gray-500">Histórico detalhado de autorizações.</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative w-full max-w-sm">
-              <input
-                type="text"
-                placeholder="Buscar por cooperado, estabelecimento..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            </div>
-            <ExportarDropdown />
+          <div className="flex items-center space-x-2">
+             <ExportarDropdown />
           </div>
         </div>
+
+        {/* --- BARRA DE FILTROS --- */}
+        <div className="p-4 bg-gray-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="md:col-span-1">
+             <label className="text-xs font-semibold text-gray-500">Busca Geral</label>
+             <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Nome, Cartão, ID ou Conta"
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+          </div>
+          <div>
+             <label className="text-xs font-semibold text-gray-500">Cooperativa</label>
+             <select 
+               value={filtroCoop}
+               onChange={(e) => setFiltroCoop(e.target.value)}
+               className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+             >
+               <option value="">Todas</option>
+               <option value="Crediserv">Crediserv</option>
+               <option value="Coopesa">Coopesa</option>
+             </select>
+          </div>
+          <div>
+             <label className="text-xs font-semibold text-gray-500">PA</label>
+             <select 
+               value={filtroPA}
+               onChange={(e) => setFiltroPA(e.target.value)}
+               className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+             >
+               <option value="">Todos</option>
+               <option value="PA 03">PA 03</option>
+               <option value="PA 04">PA 04</option>
+               <option value="PA 05">PA 05</option>
+             </select>
+          </div>
+          <div>
+             <label className="text-xs font-semibold text-gray-500">Data Início</label>
+             <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          </div>
+          <div>
+             <label className="text-xs font-semibold text-gray-500">Data Fim</label>
+             <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          </div>
+        </div>
+
+        {/* --- TABELA ATUALIZADA --- */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estabelecimento</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NSU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data/Hora</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperado / Conta</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cartão / ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo Compra</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coop / PA</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Detalhes</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {transacoes.map((tx) => (
+              {transacoesFiltradas.map((tx) => (
                 <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.data}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tx.cooperado}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.tipo}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.estabelecimento}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.forma}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
-                      tx.status === 'aprovada' ? 'bg-green-100 text-green-800' :
-                      tx.status === 'negada' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">{tx.dataHora}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-xs font-bold text-gray-900">{tx.cooperado}</div>
+                    <div className="text-xs text-gray-500">CC: {tx.contaCorrente}</div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-xs font-mono text-gray-700">{tx.numeroCartaoMascarado}</div>
+                    <div className="text-xs text-gray-400">ID: {tx.idCartao}</div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                     <span className={`text-xs font-semibold ${tx.modalidade === 'Credito' ? 'text-purple-600' : 'text-blue-600'}`}>
+                        {tx.modalidade.toUpperCase()}
+                     </span>
+                     {tx.modalidade === 'Credito' && tx.planoVenda !== 'A Vista' && (
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                           {tx.parcelas}x ({tx.planoVenda.replace('Parcelado ', '')})
+                        </div>
+                     )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                     {tx.cooperativa} / {tx.pa}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-800">
+                     {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className={`px-2 py-0.5 inline-flex text-[10px] font-bold uppercase rounded-full ${
+                      tx.status === 'aprovada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.nsu}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                    {tx.status === 'aprovada' ? '-' : <span className="text-red-600 font-medium">{tx.motivoReprovacao}</span>}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <button 
+                      onClick={() => setTransacaoSelecionada(tx)}
+                      className="text-gray-400 hover:text-hub-teal transition-colors"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      
+      {/* Modal de Detalhes da Transação */}
+      {transacaoSelecionada && (
+        <ModalDetalheTransacao 
+           tx={transacaoSelecionada} 
+           onClose={() => setTransacaoSelecionada(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Componente Modal Detalhes da Transação (Novo) ---
+function ModalDetalheTransacao({ tx, onClose }: { tx: TransacaoDetalhe; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-6">
+        <div className="flex justify-between items-center pb-4 border-b">
+          <h3 className="text-xl font-semibold text-gray-800 flex items-center">
+            <Receipt className="w-6 h-6 mr-2 text-hub-teal"/> Detalhes da Transação #{tx.nsu}
+          </h3>
+          <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+           {/* Bloco Valor e Status */}
+           <div className="col-span-2 bg-gray-50 p-4 rounded-lg flex justify-between items-center border">
+              <div>
+                <p className="text-sm text-gray-500 uppercase font-bold">Valor da Compra</p>
+                <p className="text-3xl font-bold text-gray-900">{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                {/* --- CAMPO NOVO: LIMITE DISPONÍVEL NO MOMENTO --- */}
+                <p className="text-xs text-gray-500 mt-1">
+                  Limite Disp. na Compra: <span className="font-semibold text-gray-700">{tx.limiteDisponivelMomento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500 uppercase font-bold">Status</p>
+                <span className={`text-lg font-bold px-3 py-1 rounded-full ${tx.status === 'aprovada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                   {tx.status.toUpperCase()}
+                </span>
+                {tx.status === 'reprovada' && <p className="text-xs text-red-600 mt-1 font-bold">{tx.motivoReprovacao}</p>}
+              </div>
+           </div>
+
+           {/* Bloco Cartão e Cooperado */}
+           <div className="space-y-4">
+              <h4 className="font-bold text-gray-700 border-b pb-1">Dados do Pagamento</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                 <div><span className="block text-gray-500 text-xs">Cartão</span> <span className="font-mono">{tx.numeroCartaoMascarado}</span></div>
+                 <div><span className="block text-gray-500 text-xs">ID Cartão</span> <span>{tx.idCartao}</span></div>
+                 <div><span className="block text-gray-500 text-xs">Modalidade</span> <span className="font-semibold">{tx.modalidade}</span></div>
+                 <div><span className="block text-gray-500 text-xs">Plano</span> <span>{tx.planoVenda}</span></div>
+                 {tx.parcelas && <div><span className="block text-gray-500 text-xs">Parcelas</span> <span>{tx.parcelas}x</span></div>}
+                 <div><span className="block text-gray-500 text-xs">Entrada</span> <span>{tx.formaPagamento}</span></div>
+              </div>
+           </div>
+
+           {/* Bloco Origem e Estabelecimento */}
+           <div className="space-y-4">
+              <h4 className="font-bold text-gray-700 border-b pb-1">Origem e Destino</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                 <div className="col-span-2"><span className="block text-gray-500 text-xs">Cooperado</span> <span className="font-semibold">{tx.cooperado}</span></div>
+                 <div><span className="block text-gray-500 text-xs">Conta Corrente</span> <span>{tx.contaCorrente}</span></div>
+                 <div><span className="block text-gray-500 text-xs">Cooperativa/PA</span> <span>{tx.cooperativa} / {tx.pa}</span></div>
+                 <div className="col-span-2 mt-2 pt-2 border-t border-dashed">
+                    <span className="block text-gray-500 text-xs">Estabelecimento</span> 
+                    <span className="font-bold text-gray-800">{tx.estabelecimento}</span>
+                    <span className="text-xs text-gray-400 block">MCC: {tx.mcc}</span>
+                 </div>
+              </div>
+           </div>
+           
+           {/* Bloco Técnico */}
+           <div className="col-span-2 bg-gray-100 p-3 rounded text-xs font-mono text-gray-600 flex justify-between">
+              <span>Data/Hora: {tx.dataHora}</span>
+              <span>NSU: {tx.nsu}</span>
+              <span>Auth: {tx.codigoAutorizacao}</span>
+           </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button onClick={onClose} className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">
+            Fechar
+          </button>
         </div>
       </div>
     </div>
@@ -2146,7 +2556,6 @@ function ViewListaTransacoes({ kpis, transacoes }: { kpis: KpiTransacoes; transa
 
 // --- View 2: Formulário de Contestação ---
 function ViewFormContestacao() {
-  // ... (código idêntico)
   return (
     <div className="p-8 bg-white rounded-xl shadow-lg max-w-2xl mx-auto">
       <h3 className="text-xl font-semibold text-gray-800">Contestar uma Compra</h3>
@@ -2233,8 +2642,9 @@ function ViewFormContestacao() {
   );
 }
 
+
 // =======================================================================
-// DADOS MOCKADOS DE FATURAS (RESTAURADOS)
+// 12. A PÁGINA DE FATURAS (ATUALIZADA COM NOVAS COLUNAS E ABA VENCIMENTO)
 // =======================================================================
 
 type Fatura = {
@@ -2242,10 +2652,18 @@ type Fatura = {
   cooperado: string;
   referencia: string;
   vencimento: string;
+  status: 'aberta' | 'paga' | 'vencida';
+  
+  // Novos Campos Solicitados
   valorTotal: number;
   valorPago: number;
+  valorEmAberto: number;
+  contaCorrente: string;
+  cooperativa: string;
+  pa: string;
+  valorLimite: number;     // Limite total atribuído
+  valorDisponivel: number; // Quanto ainda pode gastar
   diasAtraso?: number;
-  status: 'aberta' | 'paga' | 'vencida';
 };
 
 const mockKpiFaturas = {
@@ -2256,22 +2674,66 @@ const mockKpiFaturas = {
 };
 
 const mockListaDeFaturas: Fatura[] = [
-  { id: 1, cooperado: 'Fernanda Lima Santos', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1150.00, valorPago: 0.00, status: 'aberta' },
-  { id: 2, cooperado: 'Carlos Eduardo Souza', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1150.00, valorPago: 0.00, status: 'aberta' },
-  { id: 3, cooperado: 'Ana Paula Ferreira', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1150.00, valorPago: 0.00, status: 'aberta' },
-  { id: 4, cooperado: 'João Pedro Costa', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1150.00, valorPago: 0.00, status: 'aberta' },
-  { id: 5, cooperado: 'Maria Santos Oliveira', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1150.00, valorPago: 0.00, status: 'aberta' },
-  { id: 6, cooperado: 'Daniel Oliveira Silva', referencia: '11/2025', vencimento: '24/11/2025', valorTotal: 1250.00, valorPago: 0.00, status: 'aberta' },
+  { 
+    id: 1, cooperado: 'Fernanda Lima Santos', referencia: '11/2025', vencimento: '24/11/2025', status: 'aberta',
+    valorTotal: 1150.00, valorPago: 0.00, valorEmAberto: 1150.00,
+    contaCorrente: '12345-6', cooperativa: 'Crediserv', pa: 'PA 05',
+    valorLimite: 5000.00, valorDisponivel: 3850.00
+  },
+  { 
+    id: 2, cooperado: 'Carlos Eduardo Souza', referencia: '11/2025', vencimento: '24/11/2025', status: 'aberta',
+    valorTotal: 2500.00, valorPago: 500.00, valorEmAberto: 2000.00,
+    contaCorrente: '54321-0', cooperativa: 'Coopesa', pa: 'PA 03',
+    valorLimite: 8000.00, valorDisponivel: 1200.00
+  },
+  { 
+    id: 3, cooperado: 'Ana Paula Ferreira', referencia: '11/2025', vencimento: '24/11/2025', status: 'vencida',
+    valorTotal: 3000.00, valorPago: 0.00, valorEmAberto: 3000.00, diasAtraso: 5,
+    contaCorrente: '99887-1', cooperativa: 'Crediserv', pa: 'PA 05',
+    valorLimite: 10000.00, valorDisponivel: 500.00
+  },
+  { 
+    id: 4, cooperado: 'João Pedro Costa', referencia: '11/2025', vencimento: '10/11/2025', status: 'paga',
+    valorTotal: 150.00, valorPago: 150.00, valorEmAberto: 0.00,
+    contaCorrente: '77441-2', cooperativa: 'Coopesa', pa: 'PA 04',
+    valorLimite: 2000.00, valorDisponivel: 1850.00
+  },
 ];
 
-
-// =======================================================================
-// 12. A PÁGINA DE FATURAS
-// =======================================================================
-
 function PaginaFaturas({ usuario }: { usuario: User }) {
+  const [activeTab, setActiveTab] = useState<'lista' | 'vencimento'>('lista');
+
   return (
     <div className="space-y-6">
+      {/* Menu de Abas */}
+      <div className="flex space-x-2 border-b border-gray-200">
+        <button 
+          onClick={() => setActiveTab('lista')}
+          className={`px-4 py-3 text-sm font-medium ${activeTab === 'lista' ? 'border-b-2 border-hub-teal text-hub-teal' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Listagem de Faturas
+        </button>
+        <button 
+          onClick={() => setActiveTab('vencimento')}
+          className={`px-4 py-3 text-sm font-medium ${activeTab === 'vencimento' ? 'border-b-2 border-hub-teal text-hub-teal' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Alterar Vencimento
+        </button>
+      </div>
+
+      {activeTab === 'lista' ? (
+        <ViewListagemFaturas />
+      ) : (
+        <ViewAlterarVencimento />
+      )}
+    </div>
+  );
+}
+
+// --- Sub-componente: Listagem (Tabela Completa) ---
+function ViewListagemFaturas() {
+  return (
+    <div className="space-y-6 animate-fade-in">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <KpiCard title="Total Faturas" value={mockKpiFaturas.total.toString()} change="" changeType="info" icon={File} />
@@ -2282,67 +2744,65 @@ function PaginaFaturas({ usuario }: { usuario: User }) {
 
       {/* Tabela */}
       <div className="bg-white rounded-xl shadow-lg">
-        {/* Cabeçalho da Tabela */}
         <div className="flex flex-col md:flex-row justify-between items-center p-5 border-b border-gray-200 space-y-4 md:space-y-0">
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Gestão de Faturas</h3>
-            <p className="text-sm text-gray-500">Acompanhamento e gerenciamento de faturas</p>
+            <p className="text-sm text-gray-500">Visão detalhada de débitos e limites.</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="relative w-full max-w-sm">
-              <input
-                type="text"
-                placeholder="Buscar por cooperado ou conta cartão..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
-              />
+              <input type="text" placeholder="Buscar cooperado..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal" />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             </div>
-            
             <ExportarDropdown />
-
           </div>
         </div>
 
-        {/* Tabela de Faturas */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referência</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Pago</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dias Atraso</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                {/* REMOVIDO: Coluna Ações */}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperado / Conta</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coop / PA</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ref. / Vencimento</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Limites (Disp / Total)</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valores (Aberto / Total)</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {mockListaDeFaturas.map((fatura) => (
                 <tr key={fatura.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fatura.cooperado}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fatura.referencia}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fatura.vencimento}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
-                    {fatura.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{fatura.cooperado}</div>
+                    <div className="text-xs text-gray-500">CC: {fatura.contaCorrente}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                    {fatura.valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
+                    <div>{fatura.cooperativa}</div>
+                    <div>{fatura.pa}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {fatura.diasAtraso || '-'}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                    <div className="font-bold">{fatura.referencia}</div>
+                    <div className="text-xs">{fatura.vencimento}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <div className="text-green-700 font-semibold">{fatura.valorDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                    <div className="text-xs text-gray-400">de {fatura.valorLimite.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <div className="text-red-700 font-bold">{fatura.valorEmAberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                    <div className="text-xs text-gray-500">Total: {fatura.valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
                       fatura.status === 'aberta' ? 'bg-blue-100 text-blue-800' :
                       fatura.status === 'vencida' ? 'bg-red-100 text-red-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {fatura.status}
+                      {fatura.status.toUpperCase()}
+                      {fatura.diasAtraso ? ` (${fatura.diasAtraso}d)` : ''}
                     </span>
                   </td>
-                  {/* REMOVIDO: Célula de Ações */}
                 </tr>
               ))}
             </tbody>
@@ -2353,18 +2813,95 @@ function PaginaFaturas({ usuario }: { usuario: User }) {
   );
 }
 
+// --- Sub-componente: Alterar Vencimento ---
+function ViewAlterarVencimento() {
+  const [diaVencimento, setDiaVencimento] = useState('10');
+  
+  // Cálculo Simples de Melhor dia de Compra (Aprox. 10 dias antes)
+  const calcularMelhorDia = (dia: string) => {
+    const d = parseInt(dia);
+    let melhor = d - 10;
+    if (melhor <= 0) melhor += 30;
+    return melhor;
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 animate-fade-in">
+      <h3 className="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+        <CalendarDays className="w-6 h-6 mr-2 text-hub-teal" /> Alteração de Ciclo de Faturamento
+      </h3>
+      
+      <div className="space-y-6">
+        {/* Busca Cooperado */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o Cooperado</label>
+          <div className="relative">
+            <input type="text" placeholder="Digite CPF ou Nome..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal focus:border-hub-teal" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+           <h4 className="font-bold text-gray-800 text-sm uppercase mb-4">Configuração Atual</h4>
+           <div className="flex justify-between items-center text-sm">
+              <span>Dia de Vencimento Atual: <strong>05</strong></span>
+              <span>Melhor dia de compra: <strong>25</strong></span>
+           </div>
+        </div>
+
+        {/* Nova Configuração */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Novo Dia de Vencimento</label>
+          <div className="grid grid-cols-3 gap-4">
+             {['05', '10', '15', '20', '25', '30'].map(dia => (
+               <button
+                 key={dia}
+                 onClick={() => setDiaVencimento(dia)}
+                 className={`py-2 px-4 rounded-lg border font-medium transition-all ${
+                   diaVencimento === dia 
+                   ? 'bg-hub-teal text-white border-hub-teal ring-2 ring-offset-1 ring-hub-teal' 
+                   : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                 }`}
+               >
+                 Dia {dia}
+               </button>
+             ))}
+          </div>
+        </div>
+
+        {/* Feedback Visual */}
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
+           <div>
+             <span className="block text-xs text-blue-600 uppercase font-bold">Novo Ciclo</span>
+             <span className="text-blue-900 font-medium">Vencimento todo dia {diaVencimento}</span>
+           </div>
+           <div className="text-right">
+             <span className="block text-xs text-blue-600 uppercase font-bold">Melhor Data de Compra</span>
+             <span className="text-2xl font-bold text-hub-teal">Dia {calcularMelhorDia(diaVencimento)}</span>
+           </div>
+        </div>
+
+        <button className="w-full py-3 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition">
+          Confirmar Alteração
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // =======================================================================
-// 13. A PÁGINA DE RELATÓRIOS (COM PROP DE USUÁRIO)
+// 13. A PÁGINA DE RELATÓRIOS (ATUALIZADA E DETALHADA)
 // =======================================================================
-/* ... (Todo o código da PaginaRelatorios e seus sub-componentes continua o mesmo) ... */
-// --- Dados Mockados da Página Relatórios ---
+
+// --- Tipos e Mocks ---
 type RelatorioTipo = {
-  id: number;
+  id: string;
   titulo: string;
   desc?: string;
   gerados: number;
   icon: React.ElementType;
 };
+
 type HistoricoRelatorio = {
   id: number;
   tipo: string;
@@ -2376,64 +2913,227 @@ type HistoricoRelatorio = {
   status: 'concluido' | 'processando' | 'erro';
 };
 
-const mockKpiRelatorios = {
-  total: 5,
-  processando: 1,
-  concluidos: 3,
-  comErro: 1,
-};
-
+// Dados para a Tabela de Histórico
 const mockHistoricoRelatorios: HistoricoRelatorio[] = [
   { id: 1, tipo: 'Limites Gerencial', periodo: '30/09/2025 - 31/10/2025', cooperativa: 'Central Hubcoop', formato: 'XLS', dataGeracao: '13/11/2025 13:00', registros: 300, status: 'erro' },
   { id: 2, tipo: 'Faturas Pagas', periodo: '30/09/2025 - 31/10/2025', cooperativa: 'Cooperativa Nordeste', formato: 'CSV', dataGeracao: '13/11/2025 13:00', registros: 250, status: 'concluido' },
-  { id: 3, tipo: 'Transações (Débito e Crédito)', periodo: '30/09/2025 - 31/10/2025', cooperativa: 'Cooperativa Vale do Aço', formato: 'PDF', dataGeracao: '13/11/2025 13:00', registros: 200, status: 'processando' },
-  { id: 4, tipo: 'Cadastral de Cartões', periodo: '30/09/2025 - 31/10/2025', cooperativa: 'Cooperativa Crédito Sul', formato: 'XLS', dataGeracao: '13/11/2025 13:00', registros: 150, status: 'concluido' },
-  { id: 5, tipo: 'Cartões em Atraso', periodo: '30/09/2025 - 31/10/2025', cooperativa: 'Central Hubcoop', formato: 'CSV', dataGeracao: '13/11/2025 13:00', registros: 100, status: 'concluido' },
 ];
 
-// A lista mesclada e sem duplicados
+// Lista de Tipos de Relatórios Disponíveis
 const mockTiposDeRelatorios: RelatorioTipo[] = [
-  { id: 1, titulo: 'Cartões em Atraso', desc: 'Cooperados com faturas vencidas', gerados: 1, icon: CalendarX },
-  { id: 2, titulo: 'Pagamentos', desc: 'Todos os pagamentos realizados', gerados: 0, icon: Banknote },
-  { id: 3, titulo: 'Transações (Débito e Crédito)', desc: 'Todas as transações do período', gerados: 1, icon: List },
-  { id: 4, titulo: 'Parcelamentos', desc: 'Parcelamentos de faturas', gerados: 0, icon: PieChart },
-  // { id: 5, titulo: 'Receitas e Despesas', desc: 'Movimentações financeiras', gerados: 0, icon: AreaChart },
-  { id: 6, titulo: 'Cadastro de Cartões', desc: 'Base completa de cartões', gerados: 1, icon: Contact },
-  { id: 7, titulo: 'Parcelamentos Rotativos', desc: 'Parcelamentos de juros rotativos', gerados: 0, icon: PieChart },
-  { id: 8, titulo: 'Anuidades', desc: 'Cobranças de anuidade', gerados: 0, icon: Percent },
-  { id: 9, titulo: 'Resgates do Programa de Pontos', desc: 'Todos os resgates de pontos', gerados: 0, icon: Users },
-  { id: 10, titulo: 'Ajustes da Central', desc: 'Lançamentos manuais e estornos', gerados: 0, icon: Edit2 },
-  { id: 11, titulo: 'Cartões Bloqueados por Emissão', desc: 'Cartões que nunca foram ativados', gerados: 0, icon: ShieldAlert },
-  { id: 12, titulo: 'CADOC 3040 - Coobrigações', desc: 'Relatório para Banco Central', gerados: 0, icon: Building },
-  { id: 17, titulo: 'Conciliação - Cartão de Crédito', desc: 'Conciliação de transações liquidadas', gerados: 0, icon: CheckSquare },
-  { id: 18, titulo: 'Relatório de Bins', desc: 'Cartões emitidos vs disponibilizados por BIN', gerados: 0, icon: CreditCardIcon },
-  { id: 15, titulo: 'Cessão de Crédito (Honra de Aval)', desc: 'Cooperados em cessão de crédito', gerados: 0, icon: AlertOctagon },
-  { id: 16, titulo: 'Faturas Pagas', desc: 'Relação de faturas liquidadas', gerados: 1, icon: FileCheck },
+  { id: 'anuidade', titulo: 'Relatório de Anuidades', desc: 'Cobranças, parcelas e status de anuidade', gerados: 12, icon: Percent },
+  { id: 'sala_vip', titulo: 'Uso de Sala VIP', desc: 'Acessos, custos extras e salas utilizadas', gerados: 5, icon: Armchair },
+  { id: 'servicos_adicionais', titulo: 'Serviços Adicionais', desc: 'PPR, Notificações e outros serviços contratados', gerados: 8, icon: ShieldAlert },
+  { id: 'atraso', titulo: 'Cartões em Atraso', desc: 'Cooperados com faturas vencidas', gerados: 1, icon: CalendarX },
+  { id: 'faturas', titulo: 'Faturas Pagas', desc: 'Relação de faturas liquidadas', gerados: 1, icon: FileCheck },
+  { id: 'transacoes', titulo: 'Transações', desc: 'Débito e Crédito detalhado', gerados: 1, icon: List },
+  { id: 'bins', titulo: 'Relatório de Bins', desc: 'Cartões emitidos vs disponibilizados', gerados: 0, icon: CreditCardIcon },
+];
+
+// --- MOCKS DE DADOS DETALHADOS PARA OS RELATÓRIOS NOVOS ---
+
+// 1. Mock Anuidade
+const mockDadosAnuidade = [
+  { id: 1, cpfCnpj: '123.456.789-00', nome: 'Ana Beatriz Silva', idCartao: '900103', cartaoMascarado: '4111 11** **** 1111', valorMensal: 45.90, dataCobranca: '10/11/2025', parcContratadas: 12, parcRestantes: 4 },
+  { id: 2, cpfCnpj: '12.345.678/0001-90', nome: 'Empresa Silva LTDA', idCartao: '900105', cartaoMascarado: '5500 99** **** 5500', valorMensal: 89.90, dataCobranca: '15/11/2025', parcContratadas: 12, parcRestantes: 10 },
+];
+
+// 2. Mock Sala VIP
+const mockDadosSalaVIP = [
+  { id: 1, cpfCnpj: '111.222.333-44', nome: 'Carlos Eduardo Souza', idCartao: '900102', cartaoMascarado: '5200 00** **** 2045', valor: 32.00, dataUso: '05/11/2025', cooperado: 'Carlos E. Souza', cooperativa: 'Coopesa', pa: 'PA 03', produto: 'Visa Platinum', custoExtra: 'Sim (R$ 150,00)', sala: 'W Premium Lounge GRU' },
+  { id: 2, cpfCnpj: '123.456.789-00', nome: 'Ana Beatriz Silva', idCartao: '900103', cartaoMascarado: '4111 11** **** 1111', valor: 0.00, dataUso: '12/11/2025', cooperado: 'Ana B. Silva', cooperativa: 'Crediserv', pa: 'PA 05', produto: 'Visa Infinite', custoExtra: 'Não', sala: 'Visa Infinite Lounge' },
+];
+
+// 3. Mock Serviços Adicionais
+const mockDadosServicos = [
+  { id: 1, cpfCnpj: '123.456.789-00', nome: 'Ana Beatriz Silva', idCartao: '900103', cartaoMascarado: '4111 11** **** 1111', valor: 29.90, dataContratacao: '10/01/2025', cooperativa: 'Crediserv', pa: 'PA 05', produto: 'Seguro PPR', status: '4 Parcelas Restantes' },
+  { id: 2, cpfCnpj: '543.210.987-00', nome: 'João Pedro Costa', idCartao: '900104', cartaoMascarado: '4111 00** **** 1111', valor: 5.90, dataContratacao: '01/06/2025', cooperativa: 'Coopesa', pa: 'PA 04', produto: 'Notificação SMS', status: 'Quitado / Recorrente' },
 ];
 
 
 // --- Componente PAI da Página Relatórios ---
 function PaginaRelatorios({ usuario }: { usuario: User }) {
+  const [relatorioAtivo, setRelatorioAtivo] = useState<string | null>(null);
+
+  // Se um relatório estiver ativo, mostra a visualização detalhada
+  if (relatorioAtivo) {
+    return (
+      <ViewRelatorioDetalhado 
+        tipo={relatorioAtivo} 
+        onBack={() => setRelatorioAtivo(null)} 
+      />
+    );
+  }
+
+  // Caso contrário, mostra o dashboard de relatórios (Histórico + Grid de Geração)
   return (
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <KpiCard title="Total Relatórios" value={mockKpiRelatorios.total.toString()} change="" changeType="info" icon={File} />
-        <KpiCard title="Processando" value={mockKpiRelatorios.processando.toString()} change="" changeType="info" icon={PackageSearch} />
-        <KpiCard title="Concluídos" value={mockKpiRelatorios.concluidos.toString()} change="" changeType="info" icon={PackageCheck} />
-        <KpiCard title="Com Erro" value={mockKpiRelatorios.comErro.toString()} change="" changeType="info" icon={PackageX} />
+        <KpiCard title="Total Relatórios" value="5" change="" changeType="info" icon={File} />
+        <KpiCard title="Processando" value="1" change="" changeType="info" icon={PackageSearch} />
+        <KpiCard title="Concluídos" value="3" change="" changeType="info" icon={PackageCheck} />
+        <KpiCard title="Com Erro" value="1" change="" changeType="info" icon={PackageX} />
       </div>
 
-      {/* Tabela de Histórico (AGORA PASSANDO O USUÁRIO) */}
+      {/* Tabela de Histórico */}
       <ViewHistoricoRelatorios historico={mockHistoricoRelatorios} usuario={usuario} />
 
-      {/* Grelha de Geração */}
-      <ViewGerarRelatorios tipos={mockTiposDeRelatorios} />
+      {/* Grid de Geração */}
+      <ViewGerarRelatorios tipos={mockTiposDeRelatorios} onGerar={(id) => setRelatorioAtivo(id)} />
     </div>
   );
 }
 
-// --- Componentes da Página Relatórios ---
+// --- Componente Visualização Detalhada do Relatório (NOVO) ---
+function ViewRelatorioDetalhado({ tipo, onBack }: { tipo: string; onBack: () => void }) {
+  const getTitulo = () => mockTiposDeRelatorios.find(t => t.id === tipo)?.titulo || 'Relatório';
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg flex flex-col h-full min-h-[600px]">
+      <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+        <div>
+          <h3 className="text-2xl font-semibold text-gray-800 flex items-center">
+            <FileText className="w-6 h-6 mr-2 text-hub-teal" /> {getTitulo()}
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">Visualização prévia dos dados.</p>
+        </div>
+        <div className="flex space-x-3">
+          <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Voltar</button>
+          <button className="px-4 py-2 bg-hub-teal text-white rounded-lg hover:opacity-90 flex items-center">
+            <FileDown className="w-4 h-4 mr-2"/> Exportar Excel
+          </button>
+        </div>
+      </div>
+
+      {/* Renderização Condicional baseada no Tipo */}
+      <div className="p-6 overflow-x-auto">
+        
+        {/* --- 1. RELATÓRIO DE ANUIDADE --- */}
+        {tipo === 'anuidade' && (
+          <div>
+            <div className="flex space-x-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+               <div className="flex items-center"><span className="text-sm font-bold mr-2">Filtro de Data:</span> <input type="date" className="border rounded p-1"/> <span className="mx-2">até</span> <input type="date" className="border rounded p-1"/></div>
+               <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Filtrar</button>
+            </div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-600 uppercase font-bold">
+                <tr>
+                  <th className="px-4 py-3">CPF/CNPJ</th>
+                  <th className="px-4 py-3">Nome Contratante</th>
+                  <th className="px-4 py-3">ID Cartão</th>
+                  <th className="px-4 py-3">Cartão</th>
+                  <th className="px-4 py-3">Valor Mensal</th>
+                  <th className="px-4 py-3">Data Cobrança</th>
+                  <th className="px-4 py-3">Parc. Contratadas</th>
+                  <th className="px-4 py-3">Parc. Restantes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {mockDadosAnuidade.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{item.cpfCnpj}</td>
+                    <td className="px-4 py-3 font-medium">{item.nome}</td>
+                    <td className="px-4 py-3">{item.idCartao}</td>
+                    <td className="px-4 py-3 font-mono">{item.cartaoMascarado}</td>
+                    <td className="px-4 py-3 text-green-700 font-bold">{item.valorMensal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</td>
+                    <td className="px-4 py-3">{item.dataCobranca}</td>
+                    <td className="px-4 py-3 text-center">{item.parcContratadas}</td>
+                    <td className="px-4 py-3 text-center font-bold">{item.parcRestantes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* --- 2. RELATÓRIO DE SALA VIP --- */}
+        {tipo === 'sala_vip' && (
+          <div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-600 uppercase font-bold">
+                <tr>
+                  <th className="px-4 py-3">CPF/CNPJ</th>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Cartão (ID)</th>
+                  <th className="px-4 py-3">Produto</th>
+                  <th className="px-4 py-3">Coop / PA</th>
+                  <th className="px-4 py-3">Data Uso</th>
+                  <th className="px-4 py-3">Sala Usada</th>
+                  <th className="px-4 py-3">Custo Extra</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {mockDadosSalaVIP.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{item.cpfCnpj}</td>
+                    <td className="px-4 py-3 font-medium">{item.nome}</td>
+                    <td className="px-4 py-3 font-mono">{item.cartaoMascarado} ({item.idCartao})</td>
+                    <td className="px-4 py-3">{item.produto}</td>
+                    <td className="px-4 py-3">{item.cooperativa} / {item.pa}</td>
+                    <td className="px-4 py-3">{item.dataUso}</td>
+                    <td className="px-4 py-3">{item.sala}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${item.custoExtra === 'Não' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {item.custoExtra}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* --- 3. RELATÓRIO DE SERVIÇOS ADICIONAIS --- */}
+        {tipo === 'servicos_adicionais' && (
+          <div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-600 uppercase font-bold">
+                <tr>
+                  <th className="px-4 py-3">CPF/CNPJ</th>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Cartão (ID)</th>
+                  <th className="px-4 py-3">Produto/Serviço</th>
+                  <th className="px-4 py-3">Valor</th>
+                  <th className="px-4 py-3">Data Contratação</th>
+                  <th className="px-4 py-3">Coop / PA</th>
+                  <th className="px-4 py-3">Situação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {mockDadosServicos.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{item.cpfCnpj}</td>
+                    <td className="px-4 py-3 font-medium">{item.nome}</td>
+                    <td className="px-4 py-3 font-mono">{item.cartaoMascarado} ({item.idCartao})</td>
+                    <td className="px-4 py-3">{item.produto}</td>
+                    <td className="px-4 py-3 font-bold">{item.valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</td>
+                    <td className="px-4 py-3">{item.dataContratacao}</td>
+                    <td className="px-4 py-3">{item.cooperativa} / {item.pa}</td>
+                    <td className="px-4 py-3">
+                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-semibold">{item.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* --- Placeholder para outros relatórios --- */}
+        {!['anuidade', 'sala_vip', 'servicos_adicionais'].includes(tipo) && (
+          <div className="text-center py-10 text-gray-500">
+            <p>Visualização detalhada ainda não implementada para este tipo de relatório no protótipo.</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// --- Componentes Originais da Página Relatórios (Mantidos e Atualizados) ---
 function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoRelatorio[]; usuario: User }) {
   const getStatusClass = (status: HistoricoRelatorio['status']) => {
     switch (status) {
@@ -2454,40 +3154,27 @@ function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoR
   return (
     <div className="bg-white rounded-xl shadow-lg">
       <div className="flex flex-col p-5 border-b border-gray-200 space-y-4">
-        {/* Cabeçalho e Botão */}
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Relatórios Disponíveis</h3>
             <p className="text-sm text-gray-500">Geração e download de relatórios</p>
           </div>
-          <button
-            className="flex-shrink-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors"
-            style={{ backgroundColor: HUB_BRAND_COLOR }}
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Novo Relatório
+          <button className="flex-shrink-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm transition-colors" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+            <Plus className="w-5 h-5 mr-2" /> Novo Relatório
           </button>
         </div>
 
-        {/* --- FILTROS --- */}
+        {/* --- FILTROS (CORRIGIDO: Label CPF ou CNPJ) --- */}
         <div className="pt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Filtro de Produto (Novo) */}
-<div>
-  <label className="block text-sm font-medium text-gray-700">Produto</label>
-  <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
-    <option value="">Todos</option>
-    <option value="infinite">Infinite</option>
-    <option value="black">Black</option>
-    <option value="gold">Gold</option>
-  </select>
-</div>
-
-{/* Filtro de BIN (Novo) */}
-<div>
-  <label className="block text-sm font-medium text-gray-700">BIN</label>
-  <input type="text" placeholder="Ex: 454545" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
-</div>
-          {/* Filtro de Data (Para Todos) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Produto</label>
+            <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
+              <option value="">Todos</option>
+              <option value="infinite">Infinite</option>
+              <option value="black">Black</option>
+              <option value="gold">Gold</option>
+            </select>
+          </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700">Período</label>
             <div className="flex items-center space-x-2">
@@ -2496,44 +3183,12 @@ function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoR
               <input type="date" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
             </div>
           </div>
-
-          {/* Filtro de CPF (Para Todos) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">CPF</label>
-            <input type="text" placeholder="000.000.000-00" className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
+            {/* ALTERAÇÃO AQUI: LABEL CPF OU CNPJ */}
+            <label className="block text-sm font-medium text-gray-700">CPF ou CNPJ</label>
+            <input type="text" placeholder="Documento..." className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md" />
           </div>
-
-          {/* Filtro de Cooperativa (SÓ CENTRAL VÊ) */}
-{usuario.perfil === 'Central' && (
-  <div>
-    <label className="block text-sm font-medium text-gray-700">Cooperativa</label>
-    <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
-                <option value="">Todas</option>
-                {mockCooperativas.filter(c => c.centralId === usuario.centralId).map(c => (
-                  <option key={c.id} value={c.id}>{c.nome}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Filtro de PA (CENTRAL E COOPERATIVA VÊEM) */}
-{(usuario.perfil === 'Central' || usuario.perfil === 'Cooperativa') && (
-  <div>
-    <label className="block text-sm font-medium text-gray-700">Ponto de Atendimento</label>
-    <select className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md">
-                <option value="">Todos</option>
-                {mockPontosAtendimento.filter(pa => {
-                  if (usuario.perfil === 'Cooperativa') return pa.cooperativaId === usuario.cooperativaId;
-                  // Se for central, precisa de uma lógica mais complexa (não implementada no mock)
-                  return true;
-                }).map(pa => (
-                   <option key={pa.id} value={pa.id}>{pa.nome}</option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
-        {/* --- FIM DOS NOVOS FILTROS --- */}
       </div>
 
       {/* Tabela de Histórico */}
@@ -2541,14 +3196,13 @@ function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoR
         <table className="w-full min-w-max">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Relatório</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperativa</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formato</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Geração</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registros</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo de Relatório</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cooperativa</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Formato</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data Geração</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -2557,26 +3211,12 @@ function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoR
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{rel.tipo}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rel.periodo}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rel.cooperativa}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-xs font-bold">
-                  <span className={`px-2 py-0.5 rounded-md ${getFormatoClass(rel.formato)}`}>{rel.formato}</span>
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-xs font-bold"><span className={`px-2 py-0.5 rounded-md ${getFormatoClass(rel.formato)}`}>{rel.formato}</span></td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rel.dataGeracao}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rel.registros}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${getStatusClass(rel.status)}`}>
-                    {rel.status}
-                  </span>
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${getStatusClass(rel.status)}`}>{rel.status}</span></td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                  <button title="Re-gerar" className="text-gray-400 hover:text-hub-teal p-1">
-                    <RefreshCw className="w-5 h-5" />
-                  </button>
-                  {/* Só mostra Download se estiver concluído */}
-                  {rel.status === 'concluido' && (
-                    <button title="Exportar" className="text-hub-teal hover:text-hub-teal-dark p-1">
-                      <FileDown className="w-5 h-5" />
-                    </button>
-                  )}
+                  <button title="Re-gerar" className="text-gray-400 hover:text-hub-teal p-1"><RefreshCw className="w-5 h-5" /></button>
+                  {rel.status === 'concluido' && <button title="Exportar" className="text-hub-teal hover:text-hub-teal-dark p-1"><FileDown className="w-5 h-5" /></button>}
                 </td>
               </tr>
             ))}
@@ -2587,11 +3227,11 @@ function ViewHistoricoRelatorios({ historico, usuario }: { historico: HistoricoR
   );
 }
 
-function ViewGerarRelatorios({ tipos }: { tipos: RelatorioTipo[] }) {
+function ViewGerarRelatorios({ tipos, onGerar }: { tipos: RelatorioTipo[], onGerar: (id: string) => void }) {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
        <h3 className="text-lg font-semibold text-gray-800">Gerar Novo Relatório</h3>
-       <p className="text-sm text-gray-500 mb-4">Selecione um relatório para gerar sob demanda.</p>
+       <p className="text-sm text-gray-500 mb-4">Selecione um relatório para visualizar ou gerar sob demanda.</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tipos.map(rel => (
@@ -2606,7 +3246,12 @@ function ViewGerarRelatorios({ tipos }: { tipos: RelatorioTipo[] }) {
                 <p className="text-xs text-gray-400 mt-2">Gerados: {rel.gerados}</p>
               </div>
             </div>
-            <button className="text-sm font-medium text-hub-teal hover:text-hub-teal-dark">Gerar</button>
+            <button 
+              onClick={() => onGerar(rel.id)}
+              className="text-sm font-medium text-hub-teal hover:text-hub-teal-dark border border-hub-teal px-3 py-1 rounded hover:bg-teal-50 transition"
+            >
+              Gerar
+            </button>
           </div>
         ))}
       </div>
@@ -2960,29 +3605,96 @@ function ModalNovaCentral({ onClose }: { onClose: () => void }) {
 }
 
 // =======================================================================
-// 15. A PÁGINA DE USUÁRIOS (Backoffice) - (COM PROP DE USUÁRIO)
+// 15. A PÁGINA DE USUÁRIOS (Backoffice) - (ATUALIZADO)
 // =======================================================================
 
 // --- Definição de Tipos para Usuários ---
 type PerfilUsuario = 'Atendente' | 'Consulta' | 'Gerente' | 'Administrador';
-// ... (o resto dos tipos pode continuar)
+
+type UsuarioSistema = {
+  id: number;
+  nome: string;
+  cpf: string;
+  email: string;
+  perfil: PerfilUsuario;
+  grupo: string;
+  ultimoAcesso: string;
+  status: 'Ativo' | 'Inativo';
+};
+
+// --- Definição de Tipos para Logs de Auditoria (NOVOS CAMPOS) ---
 type LogAuditoria = {
-  // ...
+  id: number;
+  dataHora: string;          
+  acao: 'CREATE' | 'UPDATE' | 'DELETE' | 'BLOCK';
+  descricao: string;         // Histórico de alterações
+  usuarioResponsavel: string;// Quem realizou
+  cooperativaRealizou: string; // Cooperativa que realizou
+  paRealizou: string;        // PA que realizou
+  
+  // Dados do Alvo da Alteração
+  afetadoCpfCnpj: string;    // CPF ou CNPJ do cooperado alterado
+  afetadoContaCartao: string;// Conta cartão vinculada
 };
 
 // --- Dados Mockados da Página Usuários ---
 const mockUsuarios: UsuarioSistema[] = [
-  // ... (os dados mockados continuam)
+  { id: 1, nome: 'Patricia Holanda', cpf: '123.456.789-00', email: 'patricia@credisis.com.br', perfil: 'Administrador', grupo: 'Central Credisis', ultimoAcesso: '17/11/2025 14:30', status: 'Ativo' },
+  { id: 2, nome: 'João da Silva', cpf: '987.654.321-11', email: 'joao@coopesa.com.br', perfil: 'Gerente', grupo: 'Coopesa', ultimoAcesso: '17/11/2025 10:15', status: 'Ativo' },
+  { id: 3, nome: 'Maria Oliveira', cpf: '456.789.123-22', email: 'maria@pa03.com.br', perfil: 'Atendente', grupo: 'PA 03', ultimoAcesso: '16/11/2025 18:00', status: 'Inativo' },
 ];
 
+// --- Dados Mockados de Logs (NOVOS EXEMPLOS) ---
 const mockLogsAuditoria: LogAuditoria[] = [
-  // ... (os dados mockados continuam)
+  { 
+    id: 1, 
+    dataHora: '17/11/2025 14:45:22', 
+    acao: 'UPDATE', 
+    descricao: 'Alteração de limite de crédito de R$ 5.000 para R$ 8.000',
+    usuarioResponsavel: 'Patricia Holanda',
+    cooperativaRealizou: 'Credisis Central',
+    paRealizou: '-',
+    afetadoCpfCnpj: '111.222.333-44',
+    afetadoContaCartao: '900102'
+  },
+  { 
+    id: 2, 
+    dataHora: '17/11/2025 10:30:15', 
+    acao: 'BLOCK', 
+    descricao: 'Bloqueio preventivo de cartão por suspeita de fraude',
+    usuarioResponsavel: 'João da Silva',
+    cooperativaRealizou: 'Coopesa',
+    paRealizou: 'PA 03',
+    afetadoCpfCnpj: '555.666.777-88',
+    afetadoContaCartao: '900104'
+  },
+  { 
+    id: 3, 
+    dataHora: '16/11/2025 09:15:00', 
+    acao: 'CREATE', 
+    descricao: 'Cadastro de serviço adicional: Seguro PPR',
+    usuarioResponsavel: 'Maria Oliveira',
+    cooperativaRealizou: 'Coopesa',
+    paRealizou: 'PA 03',
+    afetadoCpfCnpj: '999.888.777-66',
+    afetadoContaCartao: '900103'
+  },
+  { 
+    id: 4, 
+    dataHora: '16/11/2025 08:20:10', 
+    acao: 'UPDATE', 
+    descricao: 'Atualização de endereço de entrega do cartão',
+    usuarioResponsavel: 'Sistema Integrado',
+    cooperativaRealizou: 'Credisis Central',
+    paRealizou: '-',
+    afetadoCpfCnpj: '123.456.789-00',
+    afetadoContaCartao: '900101'
+  },
 ];
 
 // --- Componente PAI da Página Usuários ---
 type UsuariosViewMode = 'lista' | 'logs';
 
-// CORREÇÃO AQUI: Adicione a prop { usuario }: { usuario: User }
 function PaginaUsuarios({ usuario }: { usuario: User }) {
   const [viewMode, setViewMode] = useState<UsuariosViewMode>('lista');
 
@@ -3134,16 +3846,23 @@ function ViewListaUsuarios({ usuarios }: { usuarios: UsuarioSistema[] }) {
   );
 }
 
-// --- View 2: Logs de Auditoria ---
+// --- View 2: Logs de Auditoria (ATUALIZADA) ---
 function ViewLogsAuditoria({ logs }: { logs: LogAuditoria[] }) {
-  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [filtroBusca, setFiltroBusca] = useState('');
   const [filtroData, setFiltroData] = useState('');
 
   const logsFiltrados = logs.filter(log => {
-    const matchUsuario = filtroUsuario === '' || log.usuario.includes(filtroUsuario);
+    // Filtra por Descrição, Usuário, Cooperado (CPF/CNPJ) ou Cooperativa
+    const matchBusca = filtroBusca === '' || 
+      log.descricao.toLowerCase().includes(filtroBusca.toLowerCase()) ||
+      log.usuarioResponsavel.toLowerCase().includes(filtroBusca.toLowerCase()) ||
+      log.afetadoCpfCnpj.includes(filtroBusca) ||
+      log.cooperativaRealizou.toLowerCase().includes(filtroBusca.toLowerCase());
+
     // Lógica de data simples (apenas "começa com")
-    const matchData = filtroData === '' || log.timestamp.startsWith(filtroData.split('-').reverse().join('/'));
-    return matchUsuario && matchData;
+    const matchData = filtroData === '' || log.dataHora.startsWith(filtroData.split('-').reverse().join('/'));
+    
+    return matchBusca && matchData;
   });
 
   return (
@@ -3153,65 +3872,81 @@ function ViewLogsAuditoria({ logs }: { logs: LogAuditoria[] }) {
         <h3 className="text-lg font-semibold text-gray-800">Logs de Auditoria</h3>
         <p className="text-sm text-gray-500">Monitoramento de todas as ações realizadas no portal.</p>
         <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mt-4">
-          <input
-            type="text"
-            placeholder="Filtrar por e-mail do usuário..."
-            value={filtroUsuario}
-            onChange={(e) => setFiltroUsuario(e.target.value)}
-            className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-lg"
-          />
+          <div className="relative w-full md:w-1/2">
+            <input
+              type="text"
+              placeholder="Buscar por CPF, Histórico, Usuário ou Cooperativa..."
+              value={filtroBusca}
+              onChange={(e) => setFiltroBusca(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hub-teal focus:border-hub-teal"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
           <input
             type="date"
             value={filtroData}
             onChange={(e) => setFiltroData(e.target.value)}
-            className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-lg"
+            className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-lg"
           />
-          <button className="flex items-center justify-center px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg">
-            <Filter className="w-4 h-4 mr-2" />
-            Filtrar
-          </button>
         </div>
       </div>
 
-      {/* Tabela de Logs */}
+      {/* Tabela de Logs Atualizada */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-max">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP de Acesso</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entidade</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Alteração</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Histórico</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origem (Coop/PA)</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cooperado Afetado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta Cartão</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {logsFiltrados.map((log) => (
               <tr key={log.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.timestamp}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{log.usuario}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.ip}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{log.dataHora}</td>
+                
                 <td className="px-6 py-4 whitespace-nowrap">
-                   <span className={`px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full ${
+                   <span className={`px-2 py-0.5 inline-flex text-xs font-bold rounded ${
                       log.acao === 'CREATE' ? 'bg-green-100 text-green-800' :
-                      log.acao === 'UPDATE' ? 'bg-yellow-100 text-yellow-800' :
+                      log.acao === 'UPDATE' ? 'bg-blue-100 text-blue-800' :
+                      log.acao === 'BLOCK' ? 'bg-red-100 text-red-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {log.acao}
                     </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.entidade} (ID: {log.entidadeId})</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-sm truncate" title={log.descricao}>{log.descricao}</td>
+
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium max-w-md truncate" title={log.descricao}>
+                  {log.descricao}
+                </td>
+
+                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600">
+                  <div className="font-semibold">{log.cooperativaRealizou}</div>
+                  <div className="text-gray-400">{log.paRealizou}</div>
+                </td>
+
+                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600">
+                   CPF/CNPJ: <span className="font-mono font-bold">{log.afetadoCpfCnpj}</span>
+                </td>
+
+                <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-600 bg-gray-50">
+                   {log.afetadoContaCartao}
+                </td>
               </tr>
             ))}
+            {logsFiltrados.length === 0 && (
+              <tr><td colSpan={6} className="p-6 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
     </div>
   );
 }
-
 // =======================================================================
 // 16. A NOVA PÁGINA DE CONFIGURAÇÕES (Segregada)
 // =======================================================================
@@ -3918,6 +4653,1371 @@ function ExportarDropdown() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// =======================================================================
+// 19. PÁGINA DE GESTÃO DE LIMITES (COMPLETA E HIERÁRQUICA)
+// =======================================================================
+
+// --- Tipos para Gestão de Limites ---
+type RegraLimite = {
+  id: number;
+  origem: 'Cooperativa' | 'PA' | 'Cooperado';
+  gatilhoPorcentagem: number; // Ex: 10, 15, 20
+  aprovadorDestino: 'Central' | 'Cooperativa'; // Quem deve aprovar
+};
+
+type SolicitacaoLimite = {
+  id: number;
+  solicitante: string; // Nome da Coop, PA ou Cooperado
+  tipoSolicitante: 'Cooperativa' | 'PA' | 'Cooperado';
+  limiteAtual: number;
+  limiteSolicitado: number;
+  aumentoPorcentagem: number;
+  status: 'Pendente' | 'Aprovado' | 'Rejeitado';
+  motivo?: string;
+};
+
+// --- Dados Mockados para Limites ---
+const mockRegrasLimite: RegraLimite[] = [
+  { id: 1, origem: 'Cooperativa', gatilhoPorcentagem: 10, aprovadorDestino: 'Central' },
+  { id: 2, origem: 'PA', gatilhoPorcentagem: 15, aprovadorDestino: 'Central' },
+  { id: 3, origem: 'Cooperado', gatilhoPorcentagem: 20, aprovadorDestino: 'Central' },
+];
+
+const mockSolicitacoesLimite: SolicitacaoLimite[] = [
+  { id: 1, solicitante: 'Cooperativa Coopesa', tipoSolicitante: 'Cooperativa', limiteAtual: 8000000, limiteSolicitado: 9500000, aumentoPorcentagem: 18.75, status: 'Pendente' },
+  { id: 2, solicitante: 'PA 03 (Coopesa)', tipoSolicitante: 'PA', limiteAtual: 500000, limiteSolicitado: 600000, aumentoPorcentagem: 20.0, status: 'Pendente' },
+  { id: 3, solicitante: 'Maria Santos (Cooperado)', tipoSolicitante: 'Cooperado', limiteAtual: 5000, limiteSolicitado: 8000, aumentoPorcentagem: 60.0, status: 'Pendente' },
+];
+
+// --- Componente Principal ---
+function PaginaGestaoLimites({ usuario }: { usuario: User }) {
+  const [activeTab, setActiveTab] = useState<'definir' | 'autorizacoes' | 'configuracoes'>('definir');
+
+  return (
+    <div className="space-y-6">
+      {/* Menu Superior da Página */}
+      <div className="flex space-x-2 border-b border-gray-200 overflow-x-auto pb-1">
+        <SubMenuButton 
+          label="Definir Limites" 
+          active={activeTab === 'definir'} 
+          onClick={() => setActiveTab('definir')} 
+        />
+        <SubMenuButton 
+          label="Autorizações Pendentes" 
+          active={activeTab === 'autorizacoes'} 
+          onClick={() => setActiveTab('autorizacoes')} 
+        />
+        {/* Configuração só aparece para quem tem poder de definir regras (Geralmente Central ou Master) */}
+        {(usuario.perfil === 'Central' || usuario.perfil === 'Master') && (
+          <SubMenuButton 
+            label="Configuração de Regras" 
+            active={activeTab === 'configuracoes'} 
+            onClick={() => setActiveTab('configuracoes')} 
+          />
+        )}
+      </div>
+
+      {/* Conteúdo das Abas */}
+      <div className="animate-fade-in">
+        {activeTab === 'definir' && <TabDefinirLimites usuario={usuario} />}
+        {activeTab === 'autorizacoes' && <TabAutorizacoesLimites usuario={usuario} />}
+        {activeTab === 'configuracoes' && <TabConfiguracaoRegras usuario={usuario} />}
+      </div>
+    </div>
+  );
+}
+
+// --- ABA 1: DEFINIR LIMITES (Lógica de Hierarquia Rígida) ---
+function TabDefinirLimites({ usuario }: { usuario: User }) {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // --- LÓGICA DE VISUALIZAÇÃO HIERÁRQUICA ---
+  
+  // 1. Se for CENTRAL -> Vê lista de COOPERATIVAS (Define limite da Coop)
+  if (usuario.perfil === 'Central') {
+    const cooperativasDaCentral = mockCooperativas.filter(c => c.centralId === usuario.centralId && c.tipo === 'Singular');
+    
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Definir Limites das Cooperativas</h3>
+        <p className="text-sm text-gray-500 mb-6">Você está visualizando as cooperativas vinculadas à sua Central. Ajuste o limite outorgado.</p>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Cooperativa</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">CNPJ</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Limite Atual</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {cooperativasDaCentral.map(coop => (
+                <tr key={coop.id}>
+                  <td className="px-6 py-4 font-medium text-gray-900">{coop.nome}</td>
+                  <td className="px-6 py-4 text-gray-500">{coop.cnpj}</td>
+                  <td className="px-6 py-4 font-bold text-gray-800">{coop.limiteOutorgado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="px-6 py-4">
+                    <button className="text-hub-teal hover:text-hub-teal-dark font-medium text-sm flex items-center">
+                      <Edit2 className="w-4 h-4 mr-1"/> Alterar Limite
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Se for COOPERATIVA -> Vê lista de PAs (Define limite do PA)
+  if (usuario.perfil === 'Cooperativa') {
+    const pasDaCooperativa = mockPontosAtendimento.filter(pa => pa.cooperativaId === usuario.cooperativaId);
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Definir Limites dos Pontos de Atendimento (PA)</h3>
+        <p className="text-sm text-gray-500 mb-6">Ajuste o limite operacional de cada PA vinculado à sua Cooperativa.</p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">PA</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Código</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Limite PA (Simulado)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {pasDaCooperativa.map(pa => (
+                <tr key={pa.id}>
+                  <td className="px-6 py-4 font-medium text-gray-900">{pa.nome}</td>
+                  <td className="px-6 py-4 text-gray-500">{pa.codigo}</td>
+                  <td className="px-6 py-4 font-bold text-gray-800">R$ 500.000,00</td> {/* Mock fixo pois PA não tinha limite no tipo original */}
+                  <td className="px-6 py-4">
+                    <button className="text-hub-teal hover:text-hub-teal-dark font-medium text-sm flex items-center">
+                      <Edit2 className="w-4 h-4 mr-1"/> Alterar Limite
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Se for PA -> Vê lista de COOPERADOS (Define limite do Cooperado)
+  if (usuario.perfil === 'PA') {
+    // Filtra cooperados deste PA
+    const cooperadosDoPA = mockCooperados.filter(c => c.pontoAtendimentoId === usuario.pontoAtendimentoId);
+    const cooperadosFiltrados = cooperadosDoPA.filter(c => c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || c.cpf.includes(searchTerm));
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Definir Limites dos Cooperados</h3>
+        <p className="text-sm text-gray-500 mb-4">Gerencie o limite de crédito individual dos cooperados do seu PA.</p>
+        
+        <div className="mb-6 max-w-md relative">
+           <input 
+              type="text" 
+              placeholder="Buscar cooperado..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Cooperado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">CPF</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Limite Cartão</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {cooperadosFiltrados.map(coop => (
+                <tr key={coop.id}>
+                  <td className="px-6 py-4 font-medium text-gray-900">{coop.nome}</td>
+                  <td className="px-6 py-4 text-gray-500">{coop.cpf}</td>
+                  {/* Mockando limite individual visualmente */}
+                  <td className="px-6 py-4 font-bold text-gray-800">R$ 5.000,00</td> 
+                  <td className="px-6 py-4">
+                    <button className="text-hub-teal hover:text-hub-teal-dark font-medium text-sm flex items-center">
+                      <Edit2 className="w-4 h-4 mr-1"/> Alterar Limite
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {cooperadosFiltrados.length === 0 && (
+                <tr><td colSpan={4} className="p-4 text-center text-gray-500">Nenhum cooperado encontrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. Se for MASTER -> Vê as Centrais (Regra implícita de topo de cadeia)
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 text-center">
+      <h3 className="text-xl font-semibold text-gray-800">Visão Master</h3>
+      <p className="text-gray-500 mt-2">O usuário Master gerencia os limites globais das Centrais.</p>
+    </div>
+  );
+}
+
+// --- ABA 2: AUTORIZAÇÕES (Fluxo de Aprovação) ---
+function TabAutorizacoesLimites({ usuario }: { usuario: User }) {
+  // Filtra as solicitações que este usuário pode ver/aprovar
+  const solicitacoesVisiveis = mockSolicitacoesLimite.filter(sol => {
+     // Se sou Central, vejo tudo que está direcionado para Central (de Coop, PA ou Cooperado que escalou)
+     if (usuario.perfil === 'Central') return true; // Simplificação para o protótipo
+     // Se sou Cooperativa, vejo o que veio do PA ou Cooperado
+     if (usuario.perfil === 'Cooperativa') return sol.tipoSolicitante !== 'Cooperativa'; 
+     return false;
+  });
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">Autorizações de Aumento de Limite</h3>
+      <p className="text-sm text-gray-500 mb-6">
+        Solicitações que excederam a alçada automática e requerem sua aprovação.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-max">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Solicitante</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Nível</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Limite Atual</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Solicitado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">% Aumento</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Ação</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {solicitacoesVisiveis.map(sol => (
+              <tr key={sol.id}>
+                <td className="px-6 py-4 font-medium text-gray-900">{sol.solicitante}</td>
+                <td className="px-6 py-4">
+                   <span className="px-2 py-1 bg-gray-100 rounded text-xs font-semibold text-gray-600">{sol.tipoSolicitante}</span>
+                </td>
+                <td className="px-6 py-4 text-gray-500">{sol.limiteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="px-6 py-4 font-bold text-hub-teal">{sol.limiteSolicitado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="px-6 py-4">
+                  <span className="text-red-600 font-bold">+{sol.aumentoPorcentagem.toFixed(2)}%</span>
+                </td>
+                <td className="px-6 py-4">
+                   <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">{sol.status}</span>
+                </td>
+                <td className="px-6 py-4 space-x-2">
+                  <button className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition">Aprovar</button>
+                  <button className="text-xs bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition">Rejeitar</button>
+                </td>
+              </tr>
+            ))}
+            {solicitacoesVisiveis.length === 0 && (
+               <tr><td colSpan={7} className="p-6 text-center text-gray-500">Nenhuma solicitação pendente para seu perfil.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// --- ABA 3: CONFIGURAÇÃO DE REGRAS (Parametrização) ---
+function TabConfiguracaoRegras({ usuario }: { usuario: User }) {
+  // Estado local para simular edição
+  const [regras, setRegras] = useState(mockRegrasLimite);
+
+  const handleUpdateRegra = (id: number, field: string, value: string | number) => {
+    setRegras(regras.map(r => r.id === id ? { ...r, [field]: value } : r));
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">Configuração de Alçadas de Aprovação</h3>
+      <p className="text-sm text-gray-500 mb-6">
+        Defina as regras de escalonamento. Quando o aumento solicitado exceder a porcentagem configurada, a aprovação será enviada para o aprovador selecionado.
+      </p>
+
+      <div className="grid gap-6">
+        {regras.map((regra) => (
+          <div key={regra.id} className="border border-gray-200 rounded-xl p-5 bg-gray-50 flex flex-col md:flex-row md:items-center justify-between shadow-sm">
+            
+            {/* Descrição da Regra */}
+            <div className="mb-4 md:mb-0 md:w-1/3">
+              <h4 className="font-bold text-gray-800 flex items-center">
+                <SlidersHorizontal className="w-4 h-4 mr-2 text-hub-teal"/>
+                Solicitação de {regra.origem}
+              </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Regra aplicada quando uma {regra.origem} solicita aumento de limite.
+              </p>
+            </div>
+
+            {/* Configuração do Gatilho */}
+            <div className="flex items-center space-x-4 md:w-2/3 justify-end">
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-600 mb-1">Se aumento for acima de:</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={regra.gatilhoPorcentagem}
+                    onChange={(e) => handleUpdateRegra(regra.id, 'gatilhoPorcentagem', parseFloat(e.target.value))}
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal focus:border-hub-teal"
+                  />
+                  <span className="absolute right-3 top-2 text-gray-500 font-bold">%</span>
+                </div>
+              </div>
+
+              <div className="flex items-center pt-5">
+                <ArrowDownUp className="w-5 h-5 text-gray-400 mx-2 transform rotate-90 md:rotate-0" />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-600 mb-1">Enviar para aprovação de:</label>
+                <select 
+                  value={regra.aprovadorDestino}
+                  onChange={(e) => handleUpdateRegra(regra.id, 'aprovadorDestino', e.target.value)}
+                  className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal focus:border-hub-teal bg-white"
+                >
+                  <option value="Cooperativa">Cooperativa</option>
+                  <option value="Central">Central</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 flex justify-end">
+        <button className="flex items-center px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow hover:bg-green-700 transition">
+          <Save className="w-5 h-5 mr-2" /> Salvar Regras
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// =======================================================================
+// 20. PÁGINA DE CONTA SALÁRIO (CORRIGIDA)
+// =======================================================================
+
+// --- Tipos Específicos para Conta Salário ---
+type EnderecoColaborador = {
+  logradouro: string; numero: string; bairro: string; cidade: string; uf: string; cep: string;
+};
+
+type DadosContaSalario = {
+  id: number;
+  colaboradorNome: string;
+  colaboradorDoc: string;
+  colaboradorEndereco: EnderecoColaborador;
+  vinculoCnpj: string;
+  vinculoNomeFantasia: string;
+  vinculoResponsavel: string;
+  cartaoNumeroCompleto: string; 
+  dataEmissaoCartao: string;
+  dataValidadeCartao: string;
+  statusCartao: 'Ativo' | 'Bloqueado' | 'Cancelado';
+  tipoConta: 'Conta Salário' | 'Conta Corrente';
+  numeroConta: string;
+  numeroContaCartao: string;
+  dataAbertura: string;
+  statusContaCorrente: 'Ativa' | 'Bloqueada' | 'Encerrada';
+  statusContaCartao: 'Ativa' | 'Bloqueada' | 'Cancelada';
+};
+
+// --- Mock de Dados Conta Salário ---
+const mockContasSalario: DadosContaSalario[] = [
+  {
+    id: 1,
+    colaboradorNome: 'João da Silva Trabalhador',
+    colaboradorDoc: '123.456.789-00',
+    colaboradorEndereco: {
+      logradouro: 'Rua das Indústrias', numero: '500', bairro: 'Distrito Industrial',
+      cidade: 'São Paulo', uf: 'SP', cep: '01000-000'
+    },
+    vinculoCnpj: '12.345.678/0001-90',
+    vinculoNomeFantasia: 'Indústrias Silva LTDA',
+    vinculoResponsavel: 'Roberto Empresário Silva',
+    cartaoNumeroCompleto: '4855123456789012',
+    dataEmissaoCartao: '12/01/2024',
+    dataValidadeCartao: '01/29',
+    statusCartao: 'Ativo',
+    tipoConta: 'Conta Salário',
+    numeroConta: '102030-4',
+    numeroContaCartao: '99887766',
+    dataAbertura: '10/01/2024',
+    statusContaCorrente: 'Ativa',
+    statusContaCartao: 'Ativa',
+  },
+  {
+    id: 2,
+    colaboradorNome: 'Maria Souza Atendente',
+    colaboradorDoc: '987.654.321-11',
+    colaboradorEndereco: {
+      logradouro: 'Av. Brasil', numero: '100', bairro: 'Centro',
+      cidade: 'Rio de Janeiro', uf: 'RJ', cep: '20000-000'
+    },
+    vinculoCnpj: '12.345.678/0001-90',
+    vinculoNomeFantasia: 'Indústrias Silva LTDA',
+    vinculoResponsavel: 'Roberto Empresário Silva',
+    cartaoNumeroCompleto: '5500987654321098',
+    dataEmissaoCartao: '16/03/2024',
+    dataValidadeCartao: '03/29',
+    statusCartao: 'Bloqueado',
+    tipoConta: 'Conta Corrente',
+    numeroConta: '405060-X',
+    numeroContaCartao: '11223344',
+    dataAbertura: '15/03/2024',
+    statusContaCorrente: 'Ativa',
+    statusContaCartao: 'Bloqueada',
+  }
+];
+
+// --- Componente Principal ---
+function PaginaContaSalario({ usuario }: { usuario: User }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedConta, setSelectedConta] = useState<DadosContaSalario | null>(null);
+
+  const contasFiltradas = mockContasSalario.filter(c => 
+    c.colaboradorNome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.colaboradorDoc.includes(searchTerm) ||
+    c.vinculoNomeFantasia.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-lg">
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800">Gestão de Conta Salário</h3>
+          <p className="text-sm text-gray-500">Colaboradores vinculados e detalhes de contas.</p>
+        </div>
+        <div className="flex mt-4 md:mt-0 space-x-2 w-full md:w-auto">
+          <div className="relative w-full md:w-72">
+            <input 
+              type="text" 
+              placeholder="Buscar colaborador, CPF ou Empresa..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Colaborador</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endereço de Entrega</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa (CNPJ)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {contasFiltradas.map((conta) => (
+                <tr key={conta.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-bold text-gray-900">{conta.colaboradorNome}</div>
+                    <div className="text-xs text-gray-500">CPF: {conta.colaboradorDoc}</div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    <p>{conta.colaboradorEndereco.logradouro}, {conta.colaboradorEndereco.numero}</p>
+                    <p className="text-xs text-gray-400">{conta.colaboradorEndereco.cidade}/{conta.colaboradorEndereco.uf} - {conta.colaboradorEndereco.cep}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                     <div className="text-sm font-medium text-gray-800">{conta.vinculoNomeFantasia}</div>
+                     <div className="text-xs text-gray-500">{conta.vinculoCnpj}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => setSelectedConta(conta)}
+                      className="text-hub-teal hover:text-hub-teal-dark p-2 bg-teal-50 rounded-full hover:bg-teal-100 transition-colors"
+                      title="Visualizar Detalhes"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {contasFiltradas.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500 italic">
+                    Nenhum colaborador encontrado com os termos pesquisados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedConta && (
+        <ModalDetalhesContaSalario 
+          dados={selectedConta} 
+          onClose={() => setSelectedConta(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Componente Modal de Detalhes ---
+function ModalDetalhesContaSalario({ dados, onClose }: { dados: DadosContaSalario; onClose: () => void }) {
+  const maskCartao = (num: string) => {
+    if (num.length < 10) return num;
+    return `${num.substring(0, 6)} ****** ${num.substring(num.length - 4)}`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
+        
+        <div className="flex justify-between items-start p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div className="flex items-center">
+            <div className="p-3 bg-blue-50 rounded-full mr-4">
+              {/* SUBSTITUÍDO 'User' POR 'Users' PARA EVITAR ERRO DE IMPORT */}
+              <Users className="w-8 h-8 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">{dados.colaboradorNome}</h3>
+              <p className="text-sm text-gray-500">CPF: {dados.colaboradorDoc}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-8 h-8" />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-8">
+          <section>
+            <h4 className="flex items-center text-lg font-semibold text-gray-800 mb-4 border-b pb-2">
+              <Building className="w-5 h-5 mr-2 text-hub-teal" /> Empresa Vinculada
+            </h4>
+            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold">Nome Fantasia</label>
+                <p className="text-gray-900 font-medium">{dados.vinculoNomeFantasia}</p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold">CNPJ</label>
+                <p className="text-gray-900 font-medium">{dados.vinculoCnpj}</p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold">Responsável</label>
+                <p className="text-gray-900 font-medium">{dados.vinculoResponsavel}</p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h4 className="flex items-center text-lg font-semibold text-gray-800 mb-4 border-b pb-2">
+              <CreditCard className="w-5 h-5 mr-2 text-hub-teal" /> Cartão de Débito
+            </h4>
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="w-full md:w-80 h-48 bg-gradient-to-br from-gray-800 to-black rounded-xl p-6 text-white shadow-lg relative overflow-hidden flex-shrink-0">
+                <div className="flex justify-between items-start">
+                  <CreditCard className="w-8 h-8 opacity-80" />
+                  <span className={`text-xs px-2 py-1 rounded font-bold ${dados.statusCartao === 'Ativo' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                    {dados.statusCartao.toUpperCase()}
+                  </span>
+                </div>
+                <div className="mt-8">
+                   <p className="text-xl font-mono tracking-widest">{maskCartao(dados.cartaoNumeroCompleto)}</p>
+                </div>
+                <div className="mt-auto pt-6 flex justify-between text-xs opacity-80">
+                  <div>
+                    <span className="block text-[10px] uppercase">Emissão</span>
+                    <span>{dados.dataEmissaoCartao}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase">Validade</span>
+                    <span>{dados.dataValidadeCartao}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 grid grid-cols-2 gap-4 content-center">
+                 <div className="p-3 bg-white border rounded shadow-sm">
+                   <label className="text-xs text-gray-500">Número Mascarado</label>
+                   <p className="font-mono text-lg">{maskCartao(dados.cartaoNumeroCompleto)}</p>
+                 </div>
+                 <div className="p-3 bg-white border rounded shadow-sm">
+                   <label className="text-xs text-gray-500">Status Cartão</label>
+                   <p className={`font-bold ${dados.statusCartao === 'Ativo' ? 'text-green-600' : 'text-red-600'}`}>
+                     {dados.statusCartao}
+                   </p>
+                 </div>
+                 <div className="p-3 bg-white border rounded shadow-sm">
+                   <label className="text-xs text-gray-500">Emissão</label>
+                   <p className="font-medium">{dados.dataEmissaoCartao}</p>
+                 </div>
+                 <div className="p-3 bg-white border rounded shadow-sm">
+                   <label className="text-xs text-gray-500">Validade</label>
+                   <p className="font-medium">{dados.dataValidadeCartao}</p>
+                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h4 className="flex items-center text-lg font-semibold text-gray-800 mb-4 border-b pb-2">
+              <Wallet className="w-5 h-5 mr-2 text-hub-teal" /> Dados da Conta
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                  <label className="text-xs text-blue-600 uppercase font-bold mb-1 block">Tipo de Conta</label>
+                  <p className="text-xl font-bold text-gray-800">{dados.tipoConta}</p>
+               </div>
+               
+               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Número da Conta</label>
+                  <p className="text-lg font-mono text-gray-900">{dados.numeroConta}</p>
+                  <div className="mt-2 text-xs">
+                    Status: <span className={`font-bold ${dados.statusContaCorrente === 'Ativa' ? 'text-green-600' : 'text-red-600'}`}>{dados.statusContaCorrente}</span>
+                  </div>
+               </div>
+
+               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Conta Cartão</label>
+                  <p className="text-lg font-mono text-gray-900">{dados.numeroContaCartao}</p>
+                  <div className="mt-2 text-xs">
+                    Status: <span className={`font-bold ${dados.statusContaCartao === 'Ativa' ? 'text-green-600' : 'text-red-600'}`}>{dados.statusContaCartao}</span>
+                  </div>
+               </div>
+               
+               <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Data Abertura</label>
+                  <p className="text-lg text-gray-900">{dados.dataAbertura}</p>
+               </div>
+            </div>
+          </section>
+
+        </div>
+        
+        <div className="p-6 border-t bg-gray-50 flex justify-end">
+          <button 
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+          >
+            Fechar Detalhes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// =======================================================================
+// 21. PÁGINA DE SERVIÇOS ADICIONAIS (GERENCIAMENTO DE COBRANÇAS EXTRAS)
+// =======================================================================
+
+// --- Tipos ---
+type TipoServicoAdicional = 'PPR' | 'Notificacao';
+type CanalNotificacao = 'SMS' | 'WhatsApp' | 'Ambos';
+
+type ParcelaPPR = {
+  numero: number;
+  vencimento: string;
+  valor: number;
+  status: 'Paga' | 'Pendente' | 'Futura';
+};
+
+type ServicoAdicional = {
+  id: number;
+  tipo: TipoServicoAdicional;
+  
+  // Dados do Contratante
+  cooperadoNome: string;
+  documento: string; // CPF ou CNPJ
+  idCartao: string;
+  cartaoMascarado: string;
+  
+  // Configuração Financeira
+  valorMensal: number;
+  diaCobranca: number;
+  
+  // Específico PPR
+  parcelas?: ParcelaPPR[];
+  
+  // Específico Notificação
+  canal?: CanalNotificacao;
+  
+  status: 'Ativo' | 'Cancelado';
+};
+
+// --- Mocks ---
+const mockServicosAdicionais: ServicoAdicional[] = [
+  {
+    id: 1,
+    tipo: 'PPR',
+    cooperadoNome: 'Ana Beatriz Silva',
+    documento: '123.456.789-00',
+    idCartao: '900103',
+    cartaoMascarado: '4111 11** **** 1111',
+    valorMensal: 29.90,
+    diaCobranca: 10,
+    status: 'Ativo',
+    parcelas: [
+      { numero: 1, vencimento: '10/10/2025', valor: 29.90, status: 'Paga' },
+      { numero: 2, vencimento: '10/11/2025', valor: 29.90, status: 'Paga' },
+      { numero: 3, vencimento: '10/12/2025', valor: 29.90, status: 'Pendente' },
+      { numero: 4, vencimento: '10/01/2026', valor: 29.90, status: 'Futura' },
+      { numero: 5, vencimento: '10/02/2026', valor: 29.90, status: 'Futura' },
+      { numero: 6, vencimento: '10/03/2026', valor: 29.90, status: 'Futura' },
+    ]
+  },
+  {
+    id: 2,
+    tipo: 'Notificacao',
+    cooperadoNome: 'Carlos Eduardo Souza',
+    documento: '543.210.987-00',
+    idCartao: '900102',
+    cartaoMascarado: '5500 00** **** 2045',
+    valorMensal: 5.90,
+    diaCobranca: 5,
+    canal: 'SMS',
+    status: 'Ativo'
+  },
+  {
+    id: 3,
+    tipo: 'Notificacao',
+    cooperadoNome: 'Empresa Silva LTDA',
+    documento: '12.345.678/0001-90',
+    idCartao: '900105',
+    cartaoMascarado: '5500 99** **** 5500',
+    valorMensal: 9.90,
+    diaCobranca: 15,
+    canal: 'WhatsApp',
+    status: 'Ativo'
+  }
+];
+
+// --- Componente Principal ---
+function PaginaServicosAdicionais({ usuario }: { usuario: User }) {
+  const [activeTab, setActiveTab] = useState<TipoServicoAdicional>('PPR');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedServico, setSelectedServico] = useState<ServicoAdicional | null>(null);
+
+  const servicosFiltrados = mockServicosAdicionais.filter(s => 
+    s.tipo === activeTab &&
+    (s.cooperadoNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     s.documento.includes(searchTerm) ||
+     s.idCartao.includes(searchTerm))
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-lg">
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800">Serviços Adicionais</h3>
+          <p className="text-sm text-gray-500">Gerencie seguros e notificações contratadas.</p>
+        </div>
+        <button className="mt-4 md:mt-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm" style={{ backgroundColor: HUB_BRAND_COLOR }}>
+          <Plus className="w-5 h-5 mr-2" /> Nova Contratação
+        </button>
+      </div>
+
+      {/* Abas */}
+      <div className="flex space-x-2 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('PPR')}
+          className={`px-6 py-3 text-sm font-medium flex items-center transition-colors border-b-2 ${activeTab === 'PPR' ? 'border-hub-teal text-hub-teal' : 'border-transparent text-gray-500'}`}
+        >
+          <ShieldAlert className="w-4 h-4 mr-2" /> Seguro PPR
+        </button>
+        <button
+          onClick={() => setActiveTab('Notificacao')}
+          className={`px-6 py-3 text-sm font-medium flex items-center transition-colors border-b-2 ${activeTab === 'Notificacao' ? 'border-hub-teal text-hub-teal' : 'border-transparent text-gray-500'}`}
+        >
+          <FileText className="w-4 h-4 mr-2" /> Notificações
+        </button>
+      </div>
+
+      {/* Filtro e Tabela */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50">
+          <div className="relative w-full md:w-96">
+            <input 
+              type="text" 
+              placeholder="Buscar por Nome, CPF/CNPJ ou ID Cartão..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contratante</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cartão</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cobrança</th>
+                {activeTab === 'PPR' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcelas (Pagas/Total)</th>}
+                {activeTab === 'Notificacao' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Canal</th>}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {servicosFiltrados.map((servico) => (
+                <tr key={servico.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-bold text-gray-900">{servico.cooperadoNome}</div>
+                    <div className="text-xs text-gray-500">{servico.documento}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-mono text-gray-700">{servico.cartaoMascarado}</div>
+                    <div className="text-xs text-gray-400">ID: {servico.idCartao}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-semibold text-green-700">
+                      {servico.valorMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                    <div className="text-xs text-gray-500">Dia {servico.diaCobranca}</div>
+                  </td>
+                  
+                  {/* Coluna Específica PPR com Barra de Progresso */}
+                  {activeTab === 'PPR' && servico.parcelas && (
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                          <div 
+                            className="bg-hub-teal h-2 rounded-full" 
+                            style={{ width: `${(servico.parcelas.filter(p => p.status === 'Paga').length / servico.parcelas.length) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-600 font-medium">
+                          {servico.parcelas.filter(p => p.status === 'Paga').length} / {servico.parcelas.length}
+                        </span>
+                      </div>
+                    </td>
+                  )}
+
+                  {/* Coluna Específica Notificação */}
+                  {activeTab === 'Notificacao' && (
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${servico.canal === 'WhatsApp' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {servico.canal}
+                      </span>
+                    </td>
+                  )}
+
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => setSelectedServico(servico)}
+                      className="text-hub-teal hover:text-hub-teal-dark p-2 bg-teal-50 rounded-full hover:bg-teal-100 transition-colors"
+                      title="Editar e Gerenciar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {servicosFiltrados.length === 0 && (
+                <tr><td colSpan={6} className="p-6 text-center text-gray-500">Nenhum serviço encontrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal de Edição/Detalhes */}
+      {selectedServico && (
+        <ModalGerenciarServico 
+          servico={selectedServico} 
+          onClose={() => setSelectedServico(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Componente Modal Gerenciar Serviço ---
+function ModalGerenciarServico({ servico, onClose }: { servico: ServicoAdicional; onClose: () => void }) {
+  const [editandoParcela, setEditandoParcela] = useState<number | null>(null);
+  const [novoValorParcela, setNovoValorParcela] = useState('');
+  
+  const [configNotificacao, setConfigNotificacao] = useState({
+    canal: servico.canal || 'SMS',
+    valor: servico.valorMensal
+  });
+
+  const handleSalvarParcela = (numeroParcela: number) => {
+    // Aqui entraria a lógica de chamada à API
+    alert(`Valor da parcela ${numeroParcela} atualizado para R$ ${novoValorParcela}`);
+    setEditandoParcela(null);
+  };
+
+  const handleSalvarNotificacao = () => {
+    alert(`Configuração de notificação atualizada:\nCanal: ${configNotificacao.canal}\nNovo Valor: ${configNotificacao.valor}`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        
+        <div className="flex justify-between items-center pb-4 border-b mb-4">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-800">Gerenciar {servico.tipo}</h3>
+            <p className="text-sm text-gray-500">{servico.cooperadoNome} - Cartão final {servico.cartaoMascarado.slice(-4)}</p>
+          </div>
+          <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        {/* --- CONTEÚDO SE FOR PPR --- */}
+        {servico.tipo === 'PPR' && servico.parcelas && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex justify-between items-center">
+              <div>
+                <span className="block text-xs text-blue-600 uppercase font-bold">Status do Contrato</span>
+                <span className="text-lg font-bold text-blue-900">
+                  {servico.parcelas.filter(p => p.status === 'Paga').length} de {servico.parcelas.length} parcelas pagas
+                </span>
+              </div>
+              <ShieldAlert className="w-8 h-8 text-blue-300"/>
+            </div>
+
+            <h4 className="font-semibold text-gray-700 mt-4">Detalhamento das Parcelas</h4>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-500">
+                  <tr>
+                    <th className="px-4 py-2">#</th>
+                    <th className="px-4 py-2">Vencimento</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Valor</th>
+                    <th className="px-4 py-2">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {servico.parcelas.map((p) => (
+                    <tr key={p.numero}>
+                      <td className="px-4 py-2">{p.numero}</td>
+                      <td className="px-4 py-2">{p.vencimento}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          p.status === 'Paga' ? 'bg-green-100 text-green-700' : 
+                          p.status === 'Pendente' ? 'bg-yellow-100 text-yellow-700' : 
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 font-medium">
+                        {editandoParcela === p.numero ? (
+                          <input 
+                            type="number" 
+                            className="w-20 px-1 border rounded focus:ring-2 focus:ring-hub-teal" 
+                            defaultValue={p.valor}
+                            onChange={(e) => setNovoValorParcela(e.target.value)}
+                          />
+                        ) : (
+                          p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {p.status !== 'Paga' && (
+                          editandoParcela === p.numero ? (
+                            <div className="flex space-x-2">
+                               <button onClick={() => handleSalvarParcela(p.numero)} className="text-green-600 hover:text-green-800" title="Salvar"><Save className="w-4 h-4"/></button>
+                               <button onClick={() => setEditandoParcela(null)} className="text-gray-400 hover:text-gray-600" title="Cancelar"><X className="w-4 h-4"/></button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setEditandoParcela(p.numero); setNovoValorParcela(p.valor.toString()) }} className="text-blue-600 hover:text-blue-800" title="Editar Valor"><Edit2 className="w-4 h-4"/></button>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --- CONTEÚDO SE FOR NOTIFICAÇÃO --- */}
+        {servico.tipo === 'Notificacao' && (
+          <div className="space-y-6">
+            <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+              <h4 className="font-semibold text-gray-800 mb-4 border-b pb-2">Configuração de Envio</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Canal de Envio</label>
+                  <select 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-hub-teal focus:border-hub-teal"
+                    value={configNotificacao.canal}
+                    onChange={(e) => setConfigNotificacao({...configNotificacao, canal: e.target.value as CanalNotificacao})}
+                  >
+                    <option value="SMS">SMS</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Ambos">Ambos (SMS + WhatsApp)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Valor Mensal (R$)</label>
+                  <input 
+                    type="number" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-hub-teal focus:border-hub-teal"
+                    value={configNotificacao.valor}
+                    onChange={(e) => setConfigNotificacao({...configNotificacao, valor: parseFloat(e.target.value)})}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 p-3 bg-blue-50 rounded text-sm text-blue-800">
+                <p><strong>Nota:</strong> A alteração do canal de envio pode impactar o custo mensal. Confirme com o cooperado antes de salvar.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button 
+                onClick={handleSalvarNotificacao}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-md flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" /> Salvar Alterações
+              </button>
+            </div>
+          </div>
+        )}
+
+        {servico.tipo === 'PPR' && (
+           <div className="mt-6 flex justify-end border-t pt-4">
+             <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Fechar</button>
+           </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+// =======================================================================
+// 22. PÁGINA DE BAIXAS MANUAIS (APENAS CENTRAL)
+// =======================================================================
+
+// --- Tipos ---
+type TipoBaixa = 'Parcelamento' | 'Compra Integral' | 'Fatura' | 'Anuidade' | 'PPR';
+
+type BaixaHistorico = {
+  id: number;
+  tipo: TipoBaixa;
+  dataHora: string;
+  valor: number;
+  status: 'Concluído' | 'Estornado';
+  
+  // Dados do Cartão/Conta
+  contaCartao: string;
+  idCartao: string;
+  cartaoMascarado: string; // 6 primeiros + 4 últimos
+  
+  // Auditoria
+  quemRealizou: string;    // Usuário logado que fez a ação
+  quemSolicitou: string;   // Quem pediu (ex: Nome do Cooperado ou Gerente)
+  motivo: string;
+};
+
+// --- Mocks ---
+const mockHistoricoBaixas: BaixaHistorico[] = [
+  {
+    id: 1,
+    tipo: 'Anuidade',
+    dataHora: '17/11/2025 10:30',
+    valor: 450.00,
+    status: 'Concluído',
+    contaCartao: '12345-6',
+    idCartao: '900103',
+    cartaoMascarado: '4111 11** **** 9988',
+    quemRealizou: 'Patricia Holanda (Credisis)',
+    quemSolicitou: 'Ana Beatriz Silva (Cooperado)',
+    motivo: 'Isenção por relacionamento/investimento'
+  },
+  {
+    id: 2,
+    tipo: 'Compra Integral',
+    dataHora: '16/11/2025 15:45',
+    valor: 1250.90,
+    status: 'Concluído',
+    contaCartao: '54321-0',
+    idCartao: '900102',
+    cartaoMascarado: '5200 00** **** 2045',
+    quemRealizou: 'Patricia Holanda (Credisis)',
+    quemSolicitou: 'Gerente da Conta',
+    motivo: 'Contestação deferida - Fraude comprovada'
+  },
+  {
+    id: 3,
+    tipo: 'Fatura',
+    dataHora: '15/11/2025 09:00',
+    valor: 3200.00,
+    status: 'Concluído',
+    contaCartao: '77441-2',
+    idCartao: '900104',
+    cartaoMascarado: '4111 00** **** 1111',
+    quemRealizou: 'Sistema Automático',
+    quemSolicitou: 'Processamento Noturno',
+    motivo: 'Baixa por pagamento em duplicidade'
+  }
+];
+
+// --- Componente Principal ---
+function PaginaBaixas({ usuario }: { usuario: User }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [showModal, setShowModal] = useState(false);
+
+  // Filtros
+  const baixasFiltradas = mockHistoricoBaixas.filter(b => {
+    const matchSearch = 
+      b.cartaoMascarado.includes(searchTerm) || 
+      b.idCartao.includes(searchTerm) || 
+      b.contaCartao.includes(searchTerm) ||
+      b.quemSolicitou.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchTipo = filtroTipo === '' || b.tipo === filtroTipo;
+
+    return matchSearch && matchTipo;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-lg">
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 flex items-center">
+            <ArrowDownCircle className="w-6 h-6 mr-2 text-hub-teal"/> Central de Baixas
+          </h3>
+          <p className="text-sm text-gray-500">Gestão de estornos, pagamentos manuais e isenções.</p>
+        </div>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="mt-4 md:mt-0 flex items-center px-4 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition" 
+          style={{ backgroundColor: HUB_BRAND_COLOR }}
+        >
+          <Plus className="w-5 h-5 mr-2" /> Nova Baixa Manual
+        </button>
+      </div>
+
+      {/* Filtros e Tabela */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Buscar Cartão, ID ou Solicitante..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-hub-teal"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+          <div>
+            <select 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-600"
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+            >
+              <option value="">Todos os Tipos</option>
+              <option value="Fatura">Pagamento de Fatura</option>
+              <option value="Compra Integral">Compra Integral</option>
+              <option value="Parcelamento">Parcelamento</option>
+              <option value="Anuidade">Anuidade</option>
+              <option value="PPR">PPR</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data/Hora</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detalhes do Cartão</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Auditoria (Quem/Motivo)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {baixasFiltradas.map((baixa) => (
+                <tr key={baixa.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{baixa.dataHora}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                      baixa.tipo === 'Fatura' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      baixa.tipo === 'Anuidade' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                      'bg-gray-50 text-gray-700 border-gray-200'
+                    }`}>
+                      {baixa.tipo}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="font-mono text-gray-800">{baixa.cartaoMascarado}</div>
+                    <div className="text-xs text-gray-500">ID: {baixa.idCartao} | Conta: {baixa.contaCartao}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    {baixa.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    <div><span className="font-bold text-xs">Realizado:</span> {baixa.quemRealizou}</div>
+                    <div><span className="font-bold text-xs">Solicitado:</span> {baixa.quemSolicitou}</div>
+                    <div className="text-xs mt-1 italic text-gray-500">"{baixa.motivo}"</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-xs font-bold text-green-700 flex items-center">
+                      <CheckCircle2 className="w-4 h-4 mr-1"/> {baixa.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {baixasFiltradas.length === 0 && (
+                <tr><td colSpan={6} className="p-8 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Nova Baixa */}
+      {showModal && (
+        <ModalNovaBaixa usuario={usuario} onClose={() => setShowModal(false)} />
+      )}
+    </div>
+  );
+}
+
+// --- Componente Modal Nova Baixa ---
+function ModalNovaBaixa({ usuario, onClose }: { usuario: User; onClose: () => void }) {
+  const [tipo, setTipo] = useState<TipoBaixa>('Fatura');
+  const [valor, setValor] = useState('');
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert('Baixa registrada com sucesso!');
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+        <div className="flex justify-between items-center p-6 border-b">
+          <h3 className="text-xl font-semibold text-gray-800">Registrar Nova Baixa</h3>
+          <button onClick={onClose}><X className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Linha 1 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Baixa</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal"
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value as TipoBaixa)}
+              >
+                <option value="Fatura">Pagamento de Fatura</option>
+                <option value="Compra Integral">Compra Integral</option>
+                <option value="Parcelamento">Parcelamento</option>
+                <option value="Anuidade">Anuidade</option>
+                <option value="PPR">PPR</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
+              <input 
+                type="number" 
+                required
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal"
+                placeholder="0,00"
+              />
+            </div>
+          </div>
+
+          {/* Linha 2: Identificação do Cartão */}
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+            <h4 className="text-sm font-bold text-gray-700 border-b pb-1">Dados do Cartão</h4>
+            <div className="grid grid-cols-3 gap-3">
+               <div className="col-span-1">
+                 <label className="block text-xs text-gray-500">ID do Cartão</label>
+                 <input type="text" placeholder="Ex: 900103" className="w-full px-2 py-1 border rounded text-sm"/>
+               </div>
+               <div className="col-span-2">
+                 <label className="block text-xs text-gray-500">Número (6 primeiros + 4 últimos)</label>
+                 <div className="flex items-center gap-2">
+                   <input type="text" maxLength={6} placeholder="411111" className="w-20 px-2 py-1 border rounded text-sm text-center"/>
+                   <span>******</span>
+                   <input type="text" maxLength={4} placeholder="1234" className="w-16 px-2 py-1 border rounded text-sm text-center"/>
+                 </div>
+               </div>
+               <div className="col-span-3">
+                 <label className="block text-xs text-gray-500">Conta Cartão</label>
+                 <input type="text" className="w-full px-2 py-1 border rounded text-sm"/>
+               </div>
+            </div>
+          </div>
+
+          {/* Linha 3: Auditoria */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quem Solicitou?</label>
+              <input type="text" placeholder="Ex: Gerente João" className="w-full px-3 py-2 border border-gray-300 rounded-lg"/>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Responsável (Logado)</label>
+              <input type="text" value={usuario.nome} disabled className="w-full px-3 py-2 border border-gray-200 bg-gray-100 rounded-lg text-gray-500"/>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo da Baixa</label>
+            <textarea 
+              rows={3} 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-hub-teal"
+              placeholder="Descreva detalhadamente o motivo..."
+            ></textarea>
+          </div>
+
+          <div className="pt-4 flex justify-end space-x-3 border-t mt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+            <button 
+              type="submit" 
+              className="px-6 py-2 text-white rounded-lg shadow-sm hover:opacity-90"
+              style={{ backgroundColor: HUB_BRAND_COLOR }}
+            >
+              Confirmar Baixa
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
