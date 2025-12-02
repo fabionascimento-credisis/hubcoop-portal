@@ -3257,27 +3257,33 @@ const mockHistoricoRelatorios: HistoricoRelatorio[] = [
 
 // Lista de Tipos de Relatórios Disponíveis
 const mockTiposDeRelatorios: RelatorioTipo[] = [
-  { id: 'carteiras_virtuais', titulo: 'Carteiras Virtuais Ativas', desc: 'Portadores com token ativo em wallets', gerados: 3, icon: Smartphone }, // NOVO
-  { id: 'anuidade', titulo: 'Relatório de Anuidades', desc: 'Cobranças, parcelas e status de anuidade', gerados: 12, icon: Percent },
-  { id: 'sala_vip', titulo: 'Uso de Sala VIP', desc: 'Acessos, custos extras e salas utilizadas', gerados: 5, icon: Armchair },
-  { id: 'servicos_adicionais', titulo: 'Serviços Adicionais', desc: 'PPR, Notificações e outros serviços contratados', gerados: 8, icon: ShieldAlert },
-  { id: 'atraso', titulo: 'Cartões em Atraso', desc: 'Cooperados com faturas vencidas', gerados: 1, icon: CalendarX },
-  { id: 'faturas', titulo: 'Faturas Pagas', desc: 'Relação de faturas liquidadas', gerados: 1, icon: FileCheck },
-  { id: 'transacoes', titulo: 'Transações', desc: 'Débito e Crédito detalhado', gerados: 1, icon: List },
-  { id: 'bins', titulo: 'Relatório de Bins', desc: 'Cartões emitidos vs disponibilizados', gerados: 0, icon: CreditCardIcon },
-  { id: 'cartoes_atraso', titulo: 'Cartões em Atraso', desc: 'Cooperados com faturas vencidas', gerados: 1, icon: CalendarX },
-  { id: 'pagamentos', titulo: 'Pagamentos', desc: 'Todos os pagamentos realizados', gerados: 0, icon: Banknote },
-  { id: 'parcelamentos_fat', titulo: 'Parcelamentos', desc: 'Parcelamentos de faturas', gerados: 0, icon: PieChart },
-  { id: 'receitas_despesas', titulo: 'Receitas e Despesas', desc: 'Movimentações financeiras', gerados: 0, icon: AreaChart },
-  { id: 'cartoes', titulo: 'Cadastro de Cartões', desc: 'Base completa de cartões', gerados: 1, icon: Contact },
-  { id: 'parcelamentos_rot', titulo: 'Parcelamentos Rotativos', desc: 'Parcelamentos de juros rotativos', gerados: 0, icon: PieChart },
-  { id: 'resgates', titulo: 'Resgates do Programa de Recompensas', desc: 'Todos os resgates de pontos', gerados: 0, icon: Users },
-  { id: 'ajustes_central', titulo: 'Ajustes da Central', desc: 'Lançamentos manuais e estornos', gerados: 0, icon: Edit2 },
-  { id: 'cartoes_bloq', titulo: 'Cartões Bloqueados por Emissão', desc: 'Cartões que nunca foram ativados', gerados: 0, icon: ShieldAlert },
-  { id: 'cadoc', titulo: 'CADOC 3040 - Coobrigações', desc: 'Relatório para Banco Central', gerados: 0, icon: Building },
-  { id: 'limites_gerencial', titulo: 'Limites Gerencial', desc: 'Limites de crédito totais', gerados: 1, icon: BarChart2 },
-  { id: 'irpi', titulo: 'IRPI - Imposto de Renda', desc: 'Informe de imposto de renda', gerados: 0, icon: FileText },
-  { id: 'cessao_credito', titulo: 'Cessão de Crédito (Honra de Aval)', desc: 'Cooperados em cessão de crédito', gerados: 0, icon: AlertOctagon },
+  // --- Transacional e Operacional ---
+  { id: 'transacoes_credito', titulo: 'Transações na Função Crédito', desc: 'Detalhamento de compras aprovadas no crédito', gerados: 15, icon: CreditCard },
+  { id: 'transacoes_debito', titulo: 'Transações na Função Débito', desc: 'Detalhamento de compras aprovadas no débito', gerados: 12, icon: CreditCard },
+  { id: 'saques_credito', titulo: 'Relatório de Saques no Crédito', desc: 'Monitoramento de retiradas em espécie (Cash Advance)', gerados: 2, icon: Banknote },
+  { id: 'contestacoes', titulo: 'Relatório de Contestações', desc: 'Disputas, Chargebacks e fraudes em análise', gerados: 4, icon: ShieldAlert },
+  
+  // --- Produtos e Serviços ---
+  { id: 'carteiras_virtuais', titulo: 'Relatório de Cartões Virtuais', desc: 'Tokenização em carteiras digitais (Wallets)', gerados: 6, icon: Smartphone },
+  { id: 'anuidade', titulo: 'Relatório de Anuidades', desc: 'Receita de anuidades e isenções concedidas', gerados: 12, icon: Percent },
+  { id: 'sala_vip', titulo: 'Uso de Sala VIP', desc: 'Acessos LoungeKey/DragonPass e custos', gerados: 5, icon: Armchair },
+  { id: 'servicos_adicionais', titulo: 'Serviços Adicionais', desc: 'Adesão de seguros, SMS e outros serviços', gerados: 8, icon: FileCheck },
+
+  // --- Financeiro e Conciliação (Novos) ---
+  { id: 'receitas', titulo: 'Relatório de Receitas', desc: 'Consolidado de receitas de intercâmbio e tarifas', gerados: 3, icon: TrendingUp },
+  { id: 'despesas', titulo: 'Relatório de Despesas', desc: 'Custos operacionais, bandeiras e processamento', gerados: 3, icon: TrendingDown },
+  { id: 'cext', titulo: 'CEXT - Conciliação de Extrato', desc: 'Arquivo de conciliação financeira diária', gerados: 30, icon: CheckSquare },
+  { id: 'daut', titulo: 'DAUT - Débito Automático', desc: 'Arquivo de remessa de débito em conta', gerados: 10, icon: RefreshCw },
+  { id: 'daur', titulo: 'DAUR - Débito Automático (Retorno)', desc: 'Processamento de retorno dos débitos', gerados: 10, icon: FileDown },
+
+  // --- Gestão de Limites e Risco ---
+  { id: 'limites_coop', titulo: 'Relatório de Limites Cooperativas', desc: 'Acompanhamento de teto operacional por singular', gerados: 1, icon: BarChart2 },
+  { id: 'cartoes_atraso', titulo: 'Cartões em Atraso (Aging)', desc: 'Carteira de crédito vencida por faixa de atraso', gerados: 4, icon: CalendarX },
+  
+  // --- Regulatórios ---
+  { id: 'cb117', titulo: 'Coobrigações (CB117)', desc: 'Relatório regulatório de garantias de cartão', gerados: 1, icon: Building },
+  { id: 'cadoc', titulo: 'CADOC 3040', desc: 'Informações de risco de crédito (SCR)', gerados: 1, icon: FileText },
+  { id: 'irpi', titulo: 'IRPI - Informe de Rendimentos', desc: 'Dados para declaração de imposto de renda', gerados: 0, icon: FileText },
 ];
 
 // --- MOCKS DE DADOS DETALHADOS PARA OS RELATÓRIOS NOVOS ---
